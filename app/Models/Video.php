@@ -28,6 +28,11 @@ class Video extends Model
     const STATUS_ACTIVE = 'active';
     const STATUS_INACTIVE = 'inactive';
 
+    public function reviews()
+    {
+        return $this->hasMany(Review::class, 'element_id')->where('type', 'video')->where('status', 'accepted');
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', self::STATUS_ACTIVE);

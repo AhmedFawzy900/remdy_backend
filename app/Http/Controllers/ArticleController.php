@@ -16,7 +16,7 @@ class ArticleController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Article::query();
+            $query = Article::with('reviews');
 
             // Filter by title
             if ($request->has('title') && $request->title) {
@@ -135,7 +135,7 @@ class ArticleController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $article = Article::find($id);
+            $article = Article::with('reviews')->find($id);
             
             if (!$article) {
                 return response()->json([

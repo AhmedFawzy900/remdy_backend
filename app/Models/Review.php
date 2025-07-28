@@ -18,9 +18,11 @@ class Review extends Model
     const TYPE_REMEDY = 'remedy';
     const TYPE_COURSE = 'course';
     const TYPE_VIDEO = 'video';
+    const TYPE_ARTICLE = 'article';
     const STATUS_PENDING = 'pending';
     const STATUS_ACCEPTED = 'accepted';
     const STATUS_REJECTED = 'rejected';
+    const STATUS_ACTIVE = 'active';
 
     public function scopePending($query)
     {
@@ -35,6 +37,11 @@ class Review extends Model
     public function scopeRejected($query)
     {
         return $query->where('status', self::STATUS_REJECTED);
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('status', self::STATUS_ACTIVE);
     }
 
     public function user()

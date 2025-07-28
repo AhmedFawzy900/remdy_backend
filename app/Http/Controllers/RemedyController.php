@@ -16,7 +16,7 @@ class RemedyController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Remedy::with(['remedyType', 'bodySystem']);
+            $query = Remedy::with(['remedyType', 'bodySystem', 'reviews']);
 
             // Filter by title/name
             if ($request->has('title') && $request->title) {
@@ -169,7 +169,7 @@ class RemedyController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $remedy = Remedy::with(['remedyType', 'bodySystem'])->find($id);
+            $remedy = Remedy::with(['remedyType', 'bodySystem', 'reviews'])->find($id);
             
             if (!$remedy) {
                 return response()->json([

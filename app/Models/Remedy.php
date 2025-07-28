@@ -48,6 +48,11 @@ class Remedy extends Model
         return $this->belongsTo(BodySystem::class);
     }
 
+    public function reviews()
+    {
+        return $this->hasMany(Review::class, 'element_id')->where('type', 'remedy')->where('status', 'accepted');
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', self::STATUS_ACTIVE);

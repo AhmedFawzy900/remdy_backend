@@ -16,7 +16,7 @@ class VideoController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Video::query();
+            $query = Video::with('reviews');
 
             // Filter by title
             if ($request->has('title') && $request->title) {
@@ -134,13 +134,15 @@ class VideoController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $video = Video::find($id);
+            $video = Video::with('reviews')->find($id);
+            
             if (!$video) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Video not found'
                 ], 404);
             }
+
             return response()->json([
                 'success' => true,
                 'data' => new VideoResource($video),

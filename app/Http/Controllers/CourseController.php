@@ -16,7 +16,7 @@ class CourseController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Course::query();
+            $query = Course::with('reviews');
 
             // Filter by title
             if ($request->has('title') && $request->title) {
@@ -58,7 +58,7 @@ class CourseController extends Controller
             // Manually load remedies for each course
             $courses->getCollection()->transform(function ($course) {
                 $remedyIds = $course->selectedRemedies ?? [];
-                $course->remedies = \App\Models\Remedy::whereIn('id', $remedyIds)->get();
+                $course->remedies = \App\Models\Remedy::with('reviews')->whereIn('id', $remedyIds)->get();
                 return $course;
             });
 
@@ -139,7 +139,7 @@ class CourseController extends Controller
             
             // Manually load remedies
             $remedyIds = $course->selectedRemedies ?? [];
-            $course->remedies = \App\Models\Remedy::whereIn('id', $remedyIds)->get();
+            $course->remedies = \App\Models\Remedy::with('reviews')->whereIn('id', $remedyIds)->get();
 
             return response()->json([
                 'success' => true,
@@ -161,7 +161,8 @@ class CourseController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $course = Course::find($id);
+            $course = Course::with('reviews')->find($id);
+            
             if (!$course) {
                 return response()->json([
                     'success' => false,
@@ -171,7 +172,7 @@ class CourseController extends Controller
             
             // Manually load remedies
             $remedyIds = $course->selectedRemedies ?? [];
-            $course->remedies = \App\Models\Remedy::whereIn('id', $remedyIds)->get();
+            $course->remedies = \App\Models\Remedy::with('reviews')->whereIn('id', $remedyIds)->get();
 
             return response()->json([
                 'success' => true,
@@ -246,7 +247,7 @@ class CourseController extends Controller
             
             // Manually load remedies
             $remedyIds = $course->selectedRemedies ?? [];
-            $course->remedies = \App\Models\Remedy::whereIn('id', $remedyIds)->get();
+            $course->remedies = \App\Models\Remedy::with('reviews')->whereIn('id', $remedyIds)->get();
 
             return response()->json([
                 'success' => true,
@@ -335,7 +336,7 @@ class CourseController extends Controller
             // Manually load remedies for each course
             $courses->transform(function ($course) {
                 $remedyIds = $course->selectedRemedies ?? [];
-                $course->remedies = \App\Models\Remedy::whereIn('id', $remedyIds)->get();
+                $course->remedies = \App\Models\Remedy::with('reviews')->whereIn('id', $remedyIds)->get();
                 return $course;
             });
 
@@ -367,7 +368,7 @@ class CourseController extends Controller
             // Manually load remedies for each course
             $courses->transform(function ($course) {
                 $remedyIds = $course->selectedRemedies ?? [];
-                $course->remedies = \App\Models\Remedy::whereIn('id', $remedyIds)->get();
+                $course->remedies = \App\Models\Remedy::with('reviews')->whereIn('id', $remedyIds)->get();
                 return $course;
             });
 
