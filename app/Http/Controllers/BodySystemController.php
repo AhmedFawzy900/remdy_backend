@@ -213,4 +213,28 @@ class BodySystemController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get all body systems without pagination for mobile app.
+     */
+    public function all(): JsonResponse
+    {
+        try {
+            $bodySystems = BodySystem::where('status', 'active')
+                ->orderBy('order', 'asc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => BodySystemResource::collection($bodySystems),
+                'message' => 'All body systems retrieved successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve body systems',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

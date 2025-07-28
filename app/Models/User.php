@@ -6,11 +6,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, HasApiTokens;
 
     /**
      * The attributes that are mass assignable.
@@ -25,6 +26,12 @@ class User extends Authenticatable
         'full_name',
         'subscription_plan',
         'account_status',
+        'phone',
+        'account_verification',
+        'otp',
+        'otp_source',
+        'otp_expired_date',
+        'code_usage',
     ];
 
     /**
@@ -35,6 +42,10 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'otp',
+        'otp_source',
+        'otp_expired_date',
+        'code_usage',
     ];
 
     /**
@@ -47,6 +58,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'otp_expired_date' => 'date',
         ];
     }
 
@@ -62,6 +74,7 @@ class User extends Authenticatable
     const STATUS_ACTIVE = 'active';
     const STATUS_INACTIVE = 'inactive';
     const STATUS_SUSPENDED = 'suspended';
+    const STATUS_BLOCKED = 'blocked';
 
     public function scopeActive($query)
     {
@@ -91,5 +104,49 @@ class User extends Authenticatable
     public function scopePro($query)
     {
         return $query->where('subscription_plan', self::PLAN_PRO);
+    }
+
+    /**
+     * Get the user's favorites.
+     */
+    public function favorites()
+    {
+        return $this->hasMany(Favorite::class);
+    }
+
+    /**
+     * Get the user's favorite remedies.
+     */
+    public function favoriteRemedies()
+    {
+        return $this->belongsToMany(Remedy::class, 'favorites', 'user_id', 'favoritable_id')
+            ->where('favoritable_type', Remedy::class);
+    }
+
+    /**
+     * Get the user's favorite articles.
+     */
+    public function favoriteArticles()
+    {
+        return $this->belongsToMany(Article::class, 'favorites', 'user_id', 'favoritable_id')
+            ->where('favoritable_type', Article::class);
+    }
+
+    /**
+     * Get the user's favorite courses.
+     */
+    public function favoriteCourses()
+    {
+        return $this->belongsToMany(Course::class, 'favorites', 'user_id', 'favoritable_id')
+            ->where('favoritable_type', Course::class);
+    }
+
+    /**
+     * Get the user's favorite videos.
+     */
+    public function favoriteVideos()
+    {
+        return $this->belongsToMany(Video::class, 'favorites', 'user_id', 'favoritable_id')
+            ->where('favoritable_type', Video::class);
     }
 }

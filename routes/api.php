@@ -43,10 +43,82 @@ Route::post('auth/login/google', [AuthController::class, 'loginWithGoogle']);
 Route::post('auth/login/apple', [AuthController::class, 'loginWithApple']);
 Route::post('auth/admin/login', [AuthController::class, 'adminLogin']);
 Route::post('auth/admin/refresh', [AuthController::class, 'refreshAdminToken']);
+
+// Mobile Authentication Routes
+Route::prefix('mobile/auth')->group(function () {
+    Route::post('register', [App\Http\Controllers\Mobile\AuthController::class, 'register']);
+    Route::post('login', [App\Http\Controllers\Mobile\AuthController::class, 'login']);
+    Route::post('send-email', [App\Http\Controllers\Mobile\AuthController::class, 'sendEmail']);
+    Route::post('check-code', [App\Http\Controllers\Mobile\AuthController::class, 'checkCode']);
+    Route::post('forget-password', [App\Http\Controllers\Mobile\AuthController::class, 'forgetPassword']);
+    
+    // Protected routes (require authentication)
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('profile', [App\Http\Controllers\Mobile\AuthController::class, 'userProfile']);
+        Route::post('profile', [App\Http\Controllers\Mobile\AuthController::class, 'updateProfile']);
+        Route::post('logout', [App\Http\Controllers\Mobile\AuthController::class, 'logout']);
+    });
+});
+
 // Image Upload
 Route::post('upload/image', [ImageUploadController::class, 'upload']);
 
-// Protected Routes
+// Public Mobile App Routes (Guest Mode)
+Route::prefix('mobile')->group(function () {
+    // Public read-only endpoints for mobile app
+    Route::get('remedies', [RemedyController::class, 'index']);
+    Route::get('remedies/{id}', [RemedyController::class, 'show']);
+  
+    Route::get('body-systems', [BodySystemController::class, 'index']);
+    Route::get('body-systems/{id}', [BodySystemController::class, 'show']);
+ 
+    
+    Route::get('articles', [ArticleController::class, 'index']);
+    Route::get('articles/{id}', [ArticleController::class, 'show']);
+   
+    Route::get('courses', [CourseController::class, 'index']);
+    Route::get('courses/{id}', [CourseController::class, 'show']);
+   
+    Route::get('videos', [VideoController::class, 'index']);
+    Route::get('videos/{id}', [VideoController::class, 'show']);
+   
+    Route::get('faqs', [FaqController::class, 'index']);
+    Route::get('faqs/{id}', [FaqController::class, 'show']);
+    
+    Route::get('about', [AboutController::class, 'index']);
+    Route::get('about/{id}', [AboutController::class, 'show']);
+    
+    Route::get('policies', [PolicyController::class, 'index']);
+    Route::get('policies/{id}', [PolicyController::class, 'show']);
+    
+    Route::get('plans', [PlanController::class, 'index']);
+    Route::get('plans/{id}', [PlanController::class, 'show']);
+    
+    Route::get('reviews', [ReviewController::class, 'index']);
+    Route::get('reviews/{id}', [ReviewController::class, 'show']);
+    
+    Route::get('diseases', [DiseaseController::class, 'index']);
+    Route::get('diseases/{id}', [DiseaseController::class, 'show']);
+    
+    Route::get('remedy-types', [RemedyTypeController::class, 'index']);
+    Route::get('remedy-types/{id}', [RemedyTypeController::class, 'show']);
+    
+    // Contact Us - public submission endpoint
+    Route::post('contact-us', [ContactUsController::class, 'store']);
+    Route::get('contact-us', [ContactUsController::class, 'index']);
+    Route::get('contact-us/{id}', [ContactUsController::class, 'show']);
+});
+
+// Protected Mobile Routes (Require Authentication)
+Route::prefix('mobile')->middleware('auth:sanctum')->group(function () {
+    // Favorites management
+    Route::post('favorites/add', [App\Http\Controllers\Mobile\FavoriteController::class, 'addToFavorites']);
+    Route::post('favorites/remove', [App\Http\Controllers\Mobile\FavoriteController::class, 'removeFromFavorites']);
+    Route::get('favorites', [App\Http\Controllers\Mobile\FavoriteController::class, 'getFavorites']);
+    Route::post('favorites/check', [App\Http\Controllers\Mobile\FavoriteController::class, 'checkFavorite']);
+});
+
+// Protected Routes (Admin Dashboard)
 Route::middleware('auth:sanctum')->group(function () {
     // Place all routes that require authentication here
     Route::apiResource('admins', AdminController::class);

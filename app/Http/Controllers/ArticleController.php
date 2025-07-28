@@ -274,4 +274,55 @@ class ArticleController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get featured articles for mobile app.
+     */
+    public function featured(): JsonResponse
+    {
+        try {
+            $articles = Article::where('status', 'active')
+                ->where('is_featured', true)
+                ->orderBy('created_at', 'desc')
+                ->limit(10)
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => ArticleResource::collection($articles),
+                'message' => 'Featured articles retrieved successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve featured articles',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get latest articles for mobile app.
+     */
+    public function latest(): JsonResponse
+    {
+        try {
+            $articles = Article::where('status', 'active')
+                ->orderBy('created_at', 'desc')
+                ->limit(10)
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => ArticleResource::collection($articles),
+                'message' => 'Latest articles retrieved successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve latest articles',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

@@ -319,4 +319,69 @@ class CourseController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get featured courses for mobile app.
+     */
+    public function featured(): JsonResponse
+    {
+        try {
+            $courses = Course::where('status', 'active')
+                ->where('is_featured', true)
+                ->orderBy('created_at', 'desc')
+                ->limit(10)
+                ->get();
+
+            // Manually load remedies for each course
+            $courses->transform(function ($course) {
+                $remedyIds = $course->selectedRemedies ?? [];
+                $course->remedies = \App\Models\Remedy::whereIn('id', $remedyIds)->get();
+                return $course;
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => CourseResource::collection($courses),
+                'message' => 'Featured courses retrieved successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve featured courses',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get latest courses for mobile app.
+     */
+    public function latest(): JsonResponse
+    {
+        try {
+            $courses = Course::where('status', 'active')
+                ->orderBy('created_at', 'desc')
+                ->limit(10)
+                ->get();
+
+            // Manually load remedies for each course
+            $courses->transform(function ($course) {
+                $remedyIds = $course->selectedRemedies ?? [];
+                $course->remedies = \App\Models\Remedy::whereIn('id', $remedyIds)->get();
+                return $course;
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => CourseResource::collection($courses),
+                'message' => 'Latest courses retrieved successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve latest courses',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

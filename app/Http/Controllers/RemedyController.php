@@ -320,4 +320,57 @@ class RemedyController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get featured remedies for mobile app.
+     */
+    public function featured(): JsonResponse
+    {
+        try {
+            $remedies = Remedy::with(['remedyType', 'bodySystem'])
+                ->where('status', 'active')
+                ->where('is_featured', true)
+                ->orderBy('created_at', 'desc')
+                ->limit(10)
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => RemedyResource::collection($remedies),
+                'message' => 'Featured remedies retrieved successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve featured remedies',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get remedies by body system for mobile app.
+     */
+    public function byBodySystem(string $bodySystemId): JsonResponse
+    {
+        try {
+            $remedies = Remedy::with(['remedyType', 'bodySystem'])
+                ->where('status', 'active')
+                ->where('body_system_id', $bodySystemId)
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => RemedyResource::collection($remedies),
+                'message' => 'Remedies by body system retrieved successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve remedies by body system',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

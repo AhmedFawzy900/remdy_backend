@@ -267,4 +267,55 @@ class VideoController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get featured videos for mobile app.
+     */
+    public function featured(): JsonResponse
+    {
+        try {
+            $videos = Video::where('status', 'active')
+                ->where('is_featured', true)
+                ->orderBy('created_at', 'desc')
+                ->limit(10)
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => VideoResource::collection($videos),
+                'message' => 'Featured videos retrieved successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve featured videos',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get latest videos for mobile app.
+     */
+    public function latest(): JsonResponse
+    {
+        try {
+            $videos = Video::where('status', 'active')
+                ->orderBy('created_at', 'desc')
+                ->limit(10)
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => VideoResource::collection($videos),
+                'message' => 'Latest videos retrieved successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve latest videos',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
