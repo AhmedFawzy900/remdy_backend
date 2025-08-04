@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Review;
+use App\Models\ReviewReaction;
 use App\Http\Resources\ReviewResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -16,7 +17,7 @@ class ReviewController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Review::with('user');
+            $query = Review::with(['user', 'reactions'])->withCount(['likes', 'dislikes']);
 
             // Filter by type
             if ($request->has('type') && $request->type) {
@@ -131,7 +132,7 @@ class ReviewController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $review = Review::with('user')->find($id);
+            $review = Review::with(['user', 'reactions'])->withCount(['likes', 'dislikes'])->find($id);
             if (!$review) {
                 return response()->json([
                     'success' => false,
@@ -253,6 +254,217 @@ class ReviewController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to toggle review status',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get paginated reviews by type and element_id.
+     */
+    public function getReviewsByTypeAndElement(Request $request, string $type, string $elementId): JsonResponse
+    {
+        try {
+            $validator = Validator::make([
+                'type' => $type,
+                'element_id' => $elementId
+            ], [
+                'type' => 'required|in:remedy,course,video,article',
+                'element_id' => 'required|integer',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $query = Review::with(['user', 'reactions'])
+                ->withCount(['likes', 'dislikes'])
+                ->where('type', $type)
+                ->where('element_id', $elementId)
+                ->where('status', Review::STATUS_ACCEPTED);
+
+            // Sort by created_at desc (latest first)
+            $query->orderBy('created_at', 'desc');
+
+            // Pagination
+            $perPage = $request->get('per_page', 15);
+            $perPage = min($perPage, 100); // Limit max per page to 100
+            $reviews = $query->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => ReviewResource::collection($reviews),
+                'pagination' => [
+                    'current_page' => $reviews->currentPage(),
+                    'last_page' => $reviews->lastPage(),
+                    'per_page' => $reviews->perPage(),
+                    'total' => $reviews->total(),
+                    'from' => $reviews->firstItem(),
+                    'to' => $reviews->lastItem(),
+                    'has_more_pages' => $reviews->hasMorePages(),
+                ],
+                'message' => 'Reviews retrieved successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve reviews',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Like a review.
+     */
+    public function likeReview(string $id): JsonResponse
+    {
+        try {
+            $review = Review::find($id);
+            if (!$review) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Review not found'
+                ], 404);
+            }
+
+            $userId = auth()->user()->id;
+
+            // Check if user already has a reaction
+            $existingReaction = ReviewReaction::where('user_id', $userId)
+                ->where('review_id', $id)
+                ->first();
+
+            if ($existingReaction) {
+                if ($existingReaction->reaction_type === ReviewReaction::REACTION_LIKE) {
+                    // User already liked, remove the like
+                    $existingReaction->delete();
+                    $message = 'Like removed successfully';
+                } else {
+                    // User disliked before, change to like
+                    $existingReaction->update(['reaction_type' => ReviewReaction::REACTION_LIKE]);
+                    $message = 'Review liked successfully';
+                }
+            } else {
+                // Create new like
+                ReviewReaction::create([
+                    'user_id' => $userId,
+                    'review_id' => $id,
+                    'reaction_type' => ReviewReaction::REACTION_LIKE,
+                ]);
+                $message = 'Review liked successfully';
+            }
+
+            // Get updated counts
+            $review->load(['user', 'reactions'])->loadCount(['likes', 'dislikes']);
+
+            return response()->json([
+                'success' => true,
+                'data' => new ReviewResource($review),
+                'message' => $message
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to like review',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Dislike a review.
+     */
+    public function dislikeReview(string $id): JsonResponse
+    {
+        try {
+            $review = Review::find($id);
+            if (!$review) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Review not found'
+                ], 404);
+            }
+
+            $userId = auth()->user()->id;
+
+            // Check if user already has a reaction
+            $existingReaction = ReviewReaction::where('user_id', $userId)
+                ->where('review_id', $id)
+                ->first();
+
+            if ($existingReaction) {
+                if ($existingReaction->reaction_type === ReviewReaction::REACTION_DISLIKE) {
+                    // User already disliked, remove the dislike
+                    $existingReaction->delete();
+                    $message = 'Dislike removed successfully';
+                } else {
+                    // User liked before, change to dislike
+                    $existingReaction->update(['reaction_type' => ReviewReaction::REACTION_DISLIKE]);
+                    $message = 'Review disliked successfully';
+                }
+            } else {
+                // Create new dislike
+                ReviewReaction::create([
+                    'user_id' => $userId,
+                    'review_id' => $id,
+                    'reaction_type' => ReviewReaction::REACTION_DISLIKE,
+                ]);
+                $message = 'Review disliked successfully';
+            }
+
+            // Get updated counts
+            $review->load(['user', 'reactions'])->loadCount(['likes', 'dislikes']);
+
+            return response()->json([
+                'success' => true,
+                'data' => new ReviewResource($review),
+                'message' => $message
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to dislike review',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get user's reaction to a review.
+     */
+    public function getUserReaction(string $id): JsonResponse
+    {
+        try {
+            $review = Review::find($id);
+            if (!$review) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Review not found'
+                ], 404);
+            }
+
+            $userId = auth()->user()->id;
+            $reaction = ReviewReaction::where('user_id', $userId)
+                ->where('review_id', $id)
+                ->first();
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'reaction_type' => $reaction ? $reaction->reaction_type : null,
+                    'has_reacted' => $reaction ? true : false
+                ],
+                'message' => 'User reaction retrieved successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get user reaction',
                 'error' => $e->getMessage()
             ], 500);
         }

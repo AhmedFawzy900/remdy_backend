@@ -38,6 +38,7 @@ class DatabaseSeeder extends Seeder
             ContactUsSeeder::class,
             NotificationSeeder::class,
             PlanSeeder::class,
+            AdSeeder::class,
         ]);
     }
 }

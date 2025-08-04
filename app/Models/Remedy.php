@@ -10,6 +10,7 @@ class Remedy extends Model
         'title',
         'main_image_url',
         'disease',
+        'disease_id',
         'remedy_type_id',
         'body_system_id',
         'description',
@@ -19,6 +20,7 @@ class Remedy extends Model
         'instructions',
         'benefits',
         'precautions',
+        'product_link',
     ];
 
     protected $casts = [
@@ -46,6 +48,11 @@ class Remedy extends Model
     public function bodySystem()
     {
         return $this->belongsTo(BodySystem::class);
+    }
+
+    public function diseaseRelation()
+    {
+        return $this->belongsTo(Disease::class, 'disease_id');
     }
 
     public function reviews()

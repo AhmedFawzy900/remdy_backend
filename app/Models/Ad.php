@@ -4,11 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class RemedyType extends Model
+class Ad extends Model
 {
     protected $fillable = [
-        'name',
-        'description',
+        'title',
         'image',
         'status',
     ];
@@ -28,10 +27,5 @@ class RemedyType extends Model
     public function scopeInactive($query)
     {
         return $query->where('status', self::STATUS_INACTIVE);
-    }
-
-    public function remedies()
-    {
-        return $this->hasMany(Remedy::class, 'remedy_type_id');
     }
 }

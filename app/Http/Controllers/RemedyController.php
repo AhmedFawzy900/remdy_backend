@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Remedy;
 use App\Http\Resources\RemedyResource;
+use App\Http\Resources\RemedyIndexResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -16,16 +17,16 @@ class RemedyController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Remedy::with(['remedyType', 'bodySystem', 'reviews']);
+            $query = Remedy::with(['remedyType', 'bodySystem', 'diseaseRelation', 'reviews.user']);
 
             // Filter by title/name
             if ($request->has('title') && $request->title) {
                 $query->where('title', 'like', '%' . $request->title . '%');
             }
 
-            // Filter by disease
-            if ($request->has('disease') && $request->disease) {
-                $query->where('disease', 'like', '%' . $request->disease . '%');
+            // Filter by disease ID
+            if ($request->has('disease_id') && $request->disease_id) {
+                $query->where('disease_id', $request->disease_id);
             }
 
             // Filter by body system
@@ -74,7 +75,7 @@ class RemedyController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => RemedyResource::collection($remedies),
+                'data' => RemedyIndexResource::collection($remedies),
                 'pagination' => [
                     'current_page' => $remedies->currentPage(),
                     'last_page' => $remedies->lastPage(),
@@ -105,6 +106,7 @@ class RemedyController extends Controller
                 'title' => 'required|string|max:255',
                 'main_image_url' => 'nullable|url',
                 'disease' => 'required|string|max:255',
+                'disease_id' => 'nullable|exists:diseases,id',
                 'remedy_type_id' => 'required|exists:remedy_types,id',
                 'body_system_id' => 'required|exists:body_systems,id',
                 'description' => 'required|string',
@@ -122,6 +124,7 @@ class RemedyController extends Controller
                 'precautions' => 'nullable|array',
                 'precautions.*.image_url' => 'nullable|url',
                 'precautions.*.name' => 'required|string',
+                'product_link' => 'nullable|url',
             ]);
 
             if ($validator->fails()) {
@@ -136,6 +139,7 @@ class RemedyController extends Controller
                 'title' => $request->title,
                 'main_image_url' => $request->main_image_url,
                 'disease' => $request->disease,
+                'disease_id' => $request->disease_id,
                 'remedy_type_id' => $request->remedy_type_id,
                 'body_system_id' => $request->body_system_id,
                 'description' => $request->description,
@@ -145,9 +149,10 @@ class RemedyController extends Controller
                 'instructions' => $request->instructions,
                 'benefits' => $request->benefits,
                 'precautions' => $request->precautions,
+                'product_link' => $request->product_link,
             ]);
 
-            $remedy->load(['remedyType', 'bodySystem']);
+            $remedy->load(['remedyType', 'bodySystem', 'diseaseRelation']);
 
             return response()->json([
                 'success' => true,
@@ -169,7 +174,7 @@ class RemedyController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $remedy = Remedy::with(['remedyType', 'bodySystem', 'reviews'])->find($id);
+            $remedy = Remedy::with(['remedyType', 'bodySystem', 'diseaseRelation', 'reviews.user', 'reviews.reactions'])->find($id);
             
             if (!$remedy) {
                 return response()->json([
@@ -178,9 +183,13 @@ class RemedyController extends Controller
                 ], 404);
             }
 
+            // Get related remedies from the same category with similar names
+            $relatedRemedies = $this->getRelatedRemedies($remedy);
+
             return response()->json([
                 'success' => true,
                 'data' => new RemedyResource($remedy),
+                'related_remedies' => RemedyResource::collection($relatedRemedies),
                 'message' => 'Remedy retrieved successfully'
             ], 200);
         } catch (\Exception $e) {
@@ -190,6 +199,45 @@ class RemedyController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Get related remedies from the same category with similar names
+     */
+    private function getRelatedRemedies(Remedy $remedy): \Illuminate\Database\Eloquent\Collection
+    {
+        // Get remedies from the same category (remedy_type_id)
+        $relatedRemedies = Remedy::where('id', '!=', $remedy->id)
+            ->where('remedy_type_id', $remedy->remedy_type_id)
+            ->where('status', 'active')
+            ->with(['remedyType', 'bodySystem', 'diseaseRelation', 'reviews.user', 'reviews.reactions'])
+            ->orderBy('created_at', 'desc')
+            ->limit(6)
+            ->get();
+
+        // If we don't have enough remedies from the same category, add remedies with similar names
+        if ($relatedRemedies->count() < 6) {
+            $remainingCount = 6 - $relatedRemedies->count();
+            
+            // Get remedies with similar names (using LIKE for partial matching)
+            $similarNameRemedies = Remedy::where('id', '!=', $remedy->id)
+                ->where('id', 'not in', $relatedRemedies->pluck('id'))
+                ->where('status', 'active')
+                ->where(function($query) use ($remedy) {
+                    $query->where('title', 'LIKE', '%' . $remedy->title . '%')
+                          ->orWhere('disease', 'LIKE', '%' . $remedy->disease . '%')
+                          ->orWhere('title', 'LIKE', '%' . $remedy->disease . '%')
+                          ->orWhere('disease', 'LIKE', '%' . $remedy->title . '%');
+                })
+                ->with(['remedyType', 'bodySystem', 'diseaseRelation', 'reviews.user', 'reviews.reactions'])
+                ->orderBy('created_at', 'desc')
+                ->limit($remainingCount)
+                ->get();
+
+            $relatedRemedies = $relatedRemedies->merge($similarNameRemedies);
+        }
+
+        return $relatedRemedies;
     }
 
     /**
@@ -211,6 +259,7 @@ class RemedyController extends Controller
                 'title' => 'sometimes|required|string|max:255',
                 'main_image_url' => 'nullable|url',
                 'disease' => 'sometimes|required|string|max:255',
+                'disease_id' => 'nullable|exists:diseases,id',
                 'remedy_type_id' => 'sometimes|required|exists:remedy_types,id',
                 'body_system_id' => 'sometimes|required|exists:body_systems,id',
                 'description' => 'sometimes|required|string',
@@ -228,6 +277,7 @@ class RemedyController extends Controller
                 'precautions' => 'nullable|array',
                 'precautions.*.image_url' => 'nullable|url',
                 'precautions.*.name' => 'required|string',
+                'product_link' => 'nullable|url',
             ]);
 
             if ($validator->fails()) {
@@ -239,7 +289,7 @@ class RemedyController extends Controller
             }
 
             $remedy->update($request->all());
-            $remedy->load(['remedyType', 'bodySystem']);
+            $remedy->load(['remedyType', 'bodySystem', 'diseaseRelation']);
 
             return response()->json([
                 'success' => true,

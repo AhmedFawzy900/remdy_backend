@@ -5,7 +5,7 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class CourseResource extends JsonResource
+class RemedyIndexResource extends JsonResource
 {
     /**
      * Transform the resource into an array.
@@ -26,26 +26,25 @@ class CourseResource extends JsonResource
 
         return [
             'id' => $this->id,
-            'image' => $this->image,
             'title' => $this->title,
+            'main_image_url' => $this->main_image_url,
+            'disease' => $this->whenLoaded('diseaseRelation', function() {
+                return $this->diseaseRelation->name;
+            }, $this->getAttribute('disease')),
+            'remedy_type' => $this->whenLoaded('remedyType', function() {
+                return $this->remedyType ? $this->remedyType->name : null;
+            }),
+            'body_system' => $this->whenLoaded('bodySystem', function() {
+                return $this->bodySystem ? $this->bodySystem->title : null;
+            }),
             'description' => $this->description,
-            'duration' => $this->duration,
-            'sessionsNumber' => $this->sessionsNumber,
-            'price' => $this->price,
-            'plan' => $this->plan,
-            'overview' => $this->overview,
-            'courseContent' => $this->courseContent,
-            'instructors' => $this->instructors,
-            'selectedRemedies' => $this->selectedRemedies,
-            'remedies' => $this->remedies ? RemedyResource::collection($this->remedies) : [],
-            'relatedCourses' => $this->relatedCourses,
+            'visible_to_plan' => $this->visible_to_plan,
             'status' => $this->status,
-            'sessions' => $this->sessions,
-            'reviews' => $reviews instanceof \Illuminate\Http\Resources\MissingValue ? [] : ReviewResource::collection($reviews->take(2)),
+            'product_link' => $this->product_link,
             'average_rating' => $averageRating,
             'review_count' => $reviewCount,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
     }
-}
+} 

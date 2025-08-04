@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Course;
 use App\Http\Resources\CourseResource;
+use App\Http\Resources\CourseIndexResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -16,7 +17,7 @@ class CourseController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Course::with('reviews');
+            $query = Course::with(['reviews.user']);
 
             // Filter by title
             if ($request->has('title') && $request->title) {
@@ -58,13 +59,13 @@ class CourseController extends Controller
             // Manually load remedies for each course
             $courses->getCollection()->transform(function ($course) {
                 $remedyIds = $course->selectedRemedies ?? [];
-                $course->remedies = \App\Models\Remedy::with('reviews')->whereIn('id', $remedyIds)->get();
+                $course->remedies = \App\Models\Remedy::with(['reviews.user'])->whereIn('id', $remedyIds)->get();
                 return $course;
             });
 
             return response()->json([
                 'success' => true,
-                'data' => CourseResource::collection($courses),
+                'data' => CourseIndexResource::collection($courses),
                 'pagination' => [
                     'current_page' => $courses->currentPage(),
                     'last_page' => $courses->lastPage(),
@@ -139,7 +140,7 @@ class CourseController extends Controller
             
             // Manually load remedies
             $remedyIds = $course->selectedRemedies ?? [];
-            $course->remedies = \App\Models\Remedy::with('reviews')->whereIn('id', $remedyIds)->get();
+            $course->remedies = \App\Models\Remedy::with(['reviews.user'])->whereIn('id', $remedyIds)->get();
 
             return response()->json([
                 'success' => true,
@@ -161,7 +162,7 @@ class CourseController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $course = Course::with('reviews')->find($id);
+            $course = Course::with(['reviews.user', 'reviews.reactions'])->find($id);
             
             if (!$course) {
                 return response()->json([
@@ -172,7 +173,7 @@ class CourseController extends Controller
             
             // Manually load remedies
             $remedyIds = $course->selectedRemedies ?? [];
-            $course->remedies = \App\Models\Remedy::with('reviews')->whereIn('id', $remedyIds)->get();
+            $course->remedies = \App\Models\Remedy::with(['reviews.user'])->whereIn('id', $remedyIds)->get();
 
             return response()->json([
                 'success' => true,
@@ -247,7 +248,7 @@ class CourseController extends Controller
             
             // Manually load remedies
             $remedyIds = $course->selectedRemedies ?? [];
-            $course->remedies = \App\Models\Remedy::with('reviews')->whereIn('id', $remedyIds)->get();
+            $course->remedies = \App\Models\Remedy::with(['reviews.user'])->whereIn('id', $remedyIds)->get();
 
             return response()->json([
                 'success' => true,
@@ -336,7 +337,7 @@ class CourseController extends Controller
             // Manually load remedies for each course
             $courses->transform(function ($course) {
                 $remedyIds = $course->selectedRemedies ?? [];
-                $course->remedies = \App\Models\Remedy::with('reviews')->whereIn('id', $remedyIds)->get();
+                $course->remedies = \App\Models\Remedy::with(['reviews.user'])->whereIn('id', $remedyIds)->get();
                 return $course;
             });
 
@@ -368,7 +369,7 @@ class CourseController extends Controller
             // Manually load remedies for each course
             $courses->transform(function ($course) {
                 $remedyIds = $course->selectedRemedies ?? [];
-                $course->remedies = \App\Models\Remedy::with('reviews')->whereIn('id', $remedyIds)->get();
+                $course->remedies = \App\Models\Remedy::with(['reviews.user'])->whereIn('id', $remedyIds)->get();
                 return $course;
             });
 

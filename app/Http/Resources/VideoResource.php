@@ -35,7 +35,7 @@ class VideoResource extends JsonResource
             'ingredients' => $this->ingredients,
             'instructions' => $this->instructions,
             'benefits' => $this->benefits,
-            'reviews' => $reviews instanceof \Illuminate\Http\Resources\MissingValue ? [] : ReviewResource::collection($reviews),
+            'reviews' => $reviews instanceof \Illuminate\Http\Resources\MissingValue ? [] : ReviewResource::collection($reviews->take(2)),
             'average_rating' => $averageRating,
             'review_count' => $reviewCount,
             'created_at' => $this->created_at,

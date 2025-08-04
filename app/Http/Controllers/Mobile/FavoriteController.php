@@ -251,4 +251,63 @@ class FavoriteController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Clear all favorites for the authenticated user.
+     */
+    public function clearFavorites(Request $request): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+            $type = $request->get('type', 'all'); // all, remedy, article, course, video
+
+            if ($type === 'all') {
+                // Clear all favorites
+                $deletedCount = Favorite::where('user_id', $user->id)->delete();
+                
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'deleted_count' => $deletedCount
+                    ],
+                    'message' => 'All favorites cleared successfully'
+                ], 200);
+            } else {
+                // Clear favorites by type
+                $modelMap = [
+                    'remedy' => Remedy::class,
+                    'article' => Article::class,
+                    'course' => Course::class,
+                    'video' => Video::class,
+                ];
+
+                if (!array_key_exists($type, $modelMap)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Invalid type. Must be: all, remedy, article, course, video'
+                    ], 400);
+                }
+
+                $modelClass = $modelMap[$type];
+                $deletedCount = Favorite::where('user_id', $user->id)
+                    ->where('favoritable_type', $modelClass)
+                    ->delete();
+
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'deleted_count' => $deletedCount,
+                        'type' => $type
+                    ],
+                    'message' => ucfirst($type) . ' favorites cleared successfully'
+                ], 200);
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to clear favorites',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 } 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Video;
 use App\Http\Resources\VideoResource;
+use App\Http\Resources\VideoIndexResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -16,7 +17,7 @@ class VideoController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Video::with('reviews');
+            $query = Video::with(['reviews.user']);
 
             // Filter by title
             if ($request->has('title') && $request->title) {
@@ -56,7 +57,7 @@ class VideoController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => VideoResource::collection($videos),
+                'data' => VideoIndexResource::collection($videos),
                 'pagination' => [
                     'current_page' => $videos->currentPage(),
                     'last_page' => $videos->lastPage(),
@@ -134,7 +135,7 @@ class VideoController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $video = Video::with('reviews')->find($id);
+            $video = Video::with(['reviews.user', 'reviews.reactions'])->find($id);
             
             if (!$video) {
                 return response()->json([
@@ -143,9 +144,13 @@ class VideoController extends Controller
                 ], 404);
             }
 
+            // Get related videos with similar content
+            $relatedVideos = $this->getRelatedVideos($video);
+
             return response()->json([
                 'success' => true,
                 'data' => new VideoResource($video),
+                'related_videos' => VideoResource::collection($relatedVideos),
                 'message' => 'Video retrieved successfully'
             ], 200);
         } catch (\Exception $e) {
@@ -319,5 +324,41 @@ class VideoController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Get related videos with similar content
+     */
+    private function getRelatedVideos(Video $video): \Illuminate\Database\Eloquent\Collection
+    {
+        // Get videos with similar titles or descriptions
+        $relatedVideos = Video::where('id', '!=', $video->id)
+            ->where('status', 'active')
+            ->where(function($query) use ($video) {
+                $query->where('title', 'LIKE', '%' . $video->title . '%')
+                      ->orWhere('description', 'LIKE', '%' . $video->title . '%')
+                      ->orWhere('title', 'LIKE', '%' . $video->description . '%')
+                      ->orWhere('description', 'LIKE', '%' . $video->description . '%');
+            })
+            ->orderBy('created_at', 'desc')
+            ->limit(6)
+            ->get();
+
+        // If we don't have enough related videos, add latest videos
+        if ($relatedVideos->count() < 6) {
+            $remainingCount = 6 - $relatedVideos->count();
+            
+            $latestVideos = Video::where('id', '!=', $video->id)
+                ->where('id', 'not in', $relatedVideos->pluck('id'))
+                ->where('status', 'active')
+                ->with(['reviews.user', 'reviews.reactions'])
+                ->orderBy('created_at', 'desc')
+                ->limit($remainingCount)
+                ->get();
+
+            $relatedVideos = $relatedVideos->merge($latestVideos);
+        }
+
+        return $relatedVideos;
     }
 }

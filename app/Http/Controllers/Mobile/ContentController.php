@@ -28,14 +28,14 @@ class ContentController extends Controller
             $limit = min($limit, 50); // Limit max to 50
 
             // Get remedies with reviews
-            $remedies = Remedy::with(['remedyType', 'bodySystem', 'reviews'])
+            $remedies = Remedy::with(['remedyType', 'bodySystem', 'reviews.user'])
                 ->where('status', 'active')
                 ->orderBy('created_at', 'desc')
                 ->limit($limit)
                 ->get();
 
             // Get articles with reviews
-            $articles = Article::with('reviews')
+            $articles = Article::with(['reviews.user'])
                 ->where('status', 'active')
                 ->where(function($query) {
                     $query->whereNull('plans')
@@ -46,7 +46,7 @@ class ContentController extends Controller
                 ->get();
 
             // Get courses with reviews
-            $courses = Course::with('reviews')
+            $courses = Course::with(['reviews.user'])
                 ->where('status', 'active')
                 ->where('plan', 'free')
                 ->orderBy('created_at', 'desc')
@@ -54,7 +54,7 @@ class ContentController extends Controller
                 ->get();
 
             // Get videos with reviews
-            $videos = Video::with('reviews')
+            $videos = Video::with(['reviews.user'])
                 ->where('status', 'active')
                 ->where(function($query) {
                     $query->whereNull('visiblePlans')
@@ -94,7 +94,7 @@ class ContentController extends Controller
 
             switch ($type) {
                 case 'remedies':
-                    $content = Remedy::with(['remedyType', 'bodySystem', 'reviews'])
+                    $content = Remedy::with(['remedyType', 'bodySystem', 'reviews.user'])
                         ->where('status', 'active')
                         ->orderBy('created_at', 'desc')
                         ->limit($limit)
@@ -103,7 +103,7 @@ class ContentController extends Controller
                     break;
 
                 case 'articles':
-                    $content = Article::with('reviews')
+                    $content = Article::with(['reviews.user'])
                         ->where('status', 'active')
                         ->where(function($query) {
                             $query->whereNull('plans')
@@ -116,7 +116,7 @@ class ContentController extends Controller
                     break;
 
                 case 'courses':
-                    $content = Course::with('reviews')
+                    $content = Course::with(['reviews.user'])
                         ->where('status', 'active')
                         ->where('plan', 'free')
                         ->orderBy('created_at', 'desc')
@@ -126,7 +126,7 @@ class ContentController extends Controller
                     break;
 
                 case 'videos':
-                    $content = Video::with('reviews')
+                    $content = Video::with(['reviews.user'])
                         ->where('status', 'active')
                         ->where(function($query) {
                             $query->whereNull('visiblePlans')
@@ -167,14 +167,14 @@ class ContentController extends Controller
         try {
             switch ($type) {
                 case 'remedies':
-                    $item = Remedy::with(['remedyType', 'bodySystem', 'reviews'])
+                    $item = Remedy::with(['remedyType', 'bodySystem', 'diseaseRelation', 'reviews.user', 'reviews.reactions'])
                         ->where('status', 'active')
                         ->find($id);
                     $resource = RemedyResource::class;
                     break;
 
                 case 'articles':
-                    $item = Article::with('reviews')
+                    $item = Article::with(['reviews.user'])
                         ->where('status', 'active')
                         ->where(function($query) {
                             $query->whereNull('plans')
@@ -185,7 +185,7 @@ class ContentController extends Controller
                     break;
 
                 case 'courses':
-                    $item = Course::with('reviews')
+                    $item = Course::with(['reviews.user'])
                         ->where('status', 'active')
                         ->where('plan', 'free')
                         ->find($id);
@@ -193,12 +193,8 @@ class ContentController extends Controller
                     break;
 
                 case 'videos':
-                    $item = Video::with('reviews')
+                    $item = Video::with(['reviews.user', 'reviews.reactions'])
                         ->where('status', 'active')
-                        ->where(function($query) {
-                            $query->whereNull('visiblePlans')
-                                  ->orWhere('visiblePlans', 'free');
-                        })
                         ->find($id);
                     $resource = VideoResource::class;
                     break;
@@ -217,11 +213,24 @@ class ContentController extends Controller
                 ], 404);
             }
 
-            return response()->json([
+            // Add related content based on type
+            $response = [
                 'success' => true,
                 'data' => new $resource($item),
                 'message' => ucfirst($type) . ' retrieved successfully'
-            ], 200);
+            ];
+
+            if ($type === 'remedies') {
+                $relatedRemedies = $this->getRelatedRemedies($item);
+                $response['related_remedies'] = RemedyResource::collection($relatedRemedies);
+            }
+
+            if ($type === 'videos') {
+                $relatedVideos = $this->getRelatedVideos($item);
+                $response['related_videos'] = VideoResource::collection($relatedVideos);
+            }
+
+            return response()->json($response, 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -241,7 +250,7 @@ class ContentController extends Controller
             $limit = min($limit, 20);
 
             // Get featured remedies
-            $featuredRemedies = Remedy::with(['remedyType', 'bodySystem', 'reviews'])
+            $featuredRemedies = Remedy::with(['remedyType', 'bodySystem', 'reviews.user'])
                 ->where('status', 'active')
                 ->where('is_featured', true)
                 ->orderBy('created_at', 'desc')
@@ -249,7 +258,7 @@ class ContentController extends Controller
                 ->get();
 
             // Get featured articles
-            $featuredArticles = Article::with('reviews')
+            $featuredArticles = Article::with(['reviews.user'])
                 ->where('status', 'active')
                 ->where('is_featured', true)
                 ->where(function($query) {
@@ -261,7 +270,7 @@ class ContentController extends Controller
                 ->get();
 
             // Get featured courses
-            $featuredCourses = Course::with('reviews')
+            $featuredCourses = Course::with(['reviews.user'])
                 ->where('status', 'active')
                 ->where('is_featured', true)
                 ->where('plan', 'free')
@@ -270,7 +279,7 @@ class ContentController extends Controller
                 ->get();
 
             // Get featured videos
-            $featuredVideos = Video::with('reviews')
+            $featuredVideos = Video::with(['reviews.user'])
                 ->where('status', 'active')
                 ->where('is_featured', true)
                 ->where(function($query) {
@@ -321,7 +330,7 @@ class ContentController extends Controller
             $results = [];
 
             if ($type === 'all' || $type === 'remedies') {
-                $remedies = Remedy::with(['remedyType', 'bodySystem', 'reviews'])
+                $remedies = Remedy::with(['remedyType', 'bodySystem', 'reviews.user'])
                     ->where('status', 'active')
                     ->where(function($q) use ($query) {
                         $q->where('title', 'like', '%' . $query . '%')
@@ -335,7 +344,7 @@ class ContentController extends Controller
             }
 
             if ($type === 'all' || $type === 'articles') {
-                $articles = Article::with('reviews')
+                $articles = Article::with(['reviews.user'])
                     ->where('status', 'active')
                     ->where(function($q) use ($query) {
                         $q->where('title', 'like', '%' . $query . '%')
@@ -352,7 +361,7 @@ class ContentController extends Controller
             }
 
             if ($type === 'all' || $type === 'courses') {
-                $courses = Course::with('reviews')
+                $courses = Course::with(['reviews.user'])
                     ->where('status', 'active')
                     ->where(function($q) use ($query) {
                         $q->where('title', 'like', '%' . $query . '%')
@@ -366,7 +375,7 @@ class ContentController extends Controller
             }
 
             if ($type === 'all' || $type === 'videos') {
-                $videos = Video::with('reviews')
+                $videos = Video::with(['reviews.user'])
                     ->where('status', 'active')
                     ->where(function($q) use ($query) {
                         $q->where('title', 'like', '%' . $query . '%')
@@ -394,5 +403,81 @@ class ContentController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Get related remedies from the same category with similar names
+     */
+    private function getRelatedRemedies(Remedy $remedy): \Illuminate\Database\Eloquent\Collection
+    {
+        // Get remedies from the same category (remedy_type_id)
+        $relatedRemedies = Remedy::where('id', '!=', $remedy->id)
+            ->where('remedy_type_id', $remedy->remedy_type_id)
+            ->where('status', 'active')
+            ->with(['remedyType', 'bodySystem', 'diseaseRelation', 'reviews.user', 'reviews.reactions'])
+            ->orderBy('created_at', 'desc')
+            ->limit(6)
+            ->get();
+
+        // If we don't have enough remedies from the same category, add remedies with similar names
+        if ($relatedRemedies->count() < 6) {
+            $remainingCount = 6 - $relatedRemedies->count();
+            
+            // Get remedies with similar names (using LIKE for partial matching)
+            $similarNameRemedies = Remedy::where('id', '!=', $remedy->id)
+                ->where('id', 'not in', $relatedRemedies->pluck('id'))
+                ->where('status', 'active')
+                ->where(function($query) use ($remedy) {
+                    $query->where('title', 'LIKE', '%' . $remedy->title . '%')
+                          ->orWhere('disease', 'LIKE', '%' . $remedy->disease . '%')
+                          ->orWhere('title', 'LIKE', '%' . $remedy->disease . '%')
+                          ->orWhere('disease', 'LIKE', '%' . $remedy->title . '%');
+                })
+                ->with(['remedyType', 'bodySystem', 'diseaseRelation', 'reviews.user', 'reviews.reactions'])
+                ->orderBy('created_at', 'desc')
+                ->limit($remainingCount)
+                ->get();
+
+            $relatedRemedies = $relatedRemedies->merge($similarNameRemedies);
+        }
+
+        return $relatedRemedies;
+    }
+
+    /**
+     * Get related videos with similar content
+     */
+    private function getRelatedVideos(Video $video): \Illuminate\Database\Eloquent\Collection
+    {
+        // Get videos with similar titles or descriptions
+        $relatedVideos = Video::where('id', '!=', $video->id)
+            ->where('status', 'active')
+            ->where(function($query) use ($video) {
+                $query->where('title', 'LIKE', '%' . $video->title . '%')
+                      ->orWhere('description', 'LIKE', '%' . $video->title . '%')
+                      ->orWhere('title', 'LIKE', '%' . $video->description . '%')
+                      ->orWhere('description', 'LIKE', '%' . $video->description . '%');
+            })
+            ->with(['reviews.user', 'reviews.reactions'])
+            ->orderBy('created_at', 'desc')
+            ->limit(6)
+            ->get();
+
+        // If we don't have enough related videos, add latest videos
+        if ($relatedVideos->count() < 6) {
+            $remainingCount = 6 - $relatedVideos->count();
+            
+            $latestVideos = Video::where('id', '!=', $video->id)
+                ->where('id', 'not in', $relatedVideos->pluck('id'))
+                ->where('status', 'active')
+                ->with(['reviews.user', 'reviews.reactions'])
+                ->orderBy('created_at', 'desc')
+                ->limit($remainingCount)
+                ->get();
+
+            $relatedVideos = $relatedVideos->merge($latestVideos);
+        }
+
+        return $relatedVideos;
     }
 } 

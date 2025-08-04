@@ -48,4 +48,19 @@ class Review extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function reactions()
+    {
+        return $this->hasMany(ReviewReaction::class);
+    }
+
+    public function likes()
+    {
+        return $this->hasMany(ReviewReaction::class)->where('reaction_type', ReviewReaction::REACTION_LIKE);
+    }
+
+    public function dislikes()
+    {
+        return $this->hasMany(ReviewReaction::class)->where('reaction_type', ReviewReaction::REACTION_DISLIKE);
+    }
 } 

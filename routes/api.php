@@ -20,6 +20,7 @@ use App\Http\Controllers\ContactUsController;
 use App\Http\Controllers\ImageUploadController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PlanController;
+use App\Http\Controllers\AdController;
 
 /*
 |--------------------------------------------------------------------------
@@ -63,6 +64,61 @@ Route::prefix('mobile/auth')->group(function () {
 // Image Upload
 Route::post('upload/image', [ImageUploadController::class, 'upload']);
 
+
+// Protected Mobile Routes (Require Authentication)
+Route::prefix('mobile')->middleware('auth:sanctum')->group(function () {
+    // Favorites management
+    Route::post('favorites/add', [App\Http\Controllers\Mobile\FavoriteController::class, 'addToFavorites']);
+    Route::post('favorites/remove', [App\Http\Controllers\Mobile\FavoriteController::class, 'removeFromFavorites']);
+    Route::post('favorites/clear', [App\Http\Controllers\Mobile\FavoriteController::class, 'clearFavorites']);
+    Route::get('favorites', [App\Http\Controllers\Mobile\FavoriteController::class, 'getFavorites']);
+    Route::post('favorites/check', [App\Http\Controllers\Mobile\FavoriteController::class, 'checkFavorite']);
+    
+    // Review reactions (like/dislike)
+    Route::post('reviews/{id}/like', [ReviewController::class, 'likeReview']);
+    Route::post('reviews/{id}/dislike', [ReviewController::class, 'dislikeReview']);
+    Route::get('reviews/{id}/user-reaction', [ReviewController::class, 'getUserReaction']);
+});
+
+// Protected Routes (Admin Dashboard)
+Route::middleware('auth:sanctum')->group(function () {
+    // Place all routes that require authentication here
+    Route::apiResource('admins', AdminController::class);
+    Route::apiResource('body-systems', BodySystemController::class);
+    Route::patch('body-systems/{id}/toggle-status', [BodySystemController::class, 'toggleStatus']);
+    Route::apiResource('remedy-types', RemedyTypeController::class);
+    Route::patch('remedy-types/{id}/toggle-status', [RemedyTypeController::class, 'toggleStatus']);
+    Route::apiResource('remedies', RemedyController::class);
+    Route::patch('remedies/{id}/toggle-status', [RemedyController::class, 'toggleStatus']);
+    Route::apiResource('users', UserController::class);
+    Route::patch('users/{id}/toggle-status', [UserController::class, 'toggleStatus']);
+    Route::apiResource('articles', ArticleController::class);
+    Route::patch('articles/{id}/toggle-status', [ArticleController::class, 'toggleStatus']);
+    Route::apiResource('courses', CourseController::class);
+    Route::patch('courses/{id}/toggle-status', [CourseController::class, 'toggleStatus']);
+    Route::apiResource('videos', VideoController::class);
+    Route::patch('videos/{id}/toggle-status', [VideoController::class, 'toggleStatus']);
+    Route::apiResource('diseases', DiseaseController::class);
+    Route::patch('diseases/{id}/toggle-status', [DiseaseController::class, 'toggleStatus']);
+    Route::apiResource('faqs', FaqController::class);
+    Route::patch('faqs/{id}/toggle-status', [FaqController::class, 'toggleStatus']);
+    Route::apiResource('policies', PolicyController::class);
+    Route::patch('policies/{id}/toggle-status', [PolicyController::class, 'toggleStatus']);
+    Route::apiResource('reviews', ReviewController::class)->only(['index', 'show', 'store','update','destroy']);
+    Route::patch('reviews/{id}/toggle-status', [ReviewController::class, 'toggleStatus']);
+    Route::get('reviews/{type}/{elementId}', [ReviewController::class, 'getReviewsByTypeAndElement']);
+   
+    Route::apiResource('contact-us', ContactUsController::class);
+    Route::patch('contact-us/{id}/change-status', [ContactUsController::class, 'changeStatus']);
+    Route::apiResource('notifications', NotificationController::class);
+    Route::patch('notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead']);
+    Route::patch('notifications/{id}/archive', [NotificationController::class, 'archive']);
+    Route::apiResource('plans', PlanController::class)->only(['index', 'show']);
+    Route::apiResource('about', AboutController::class);
+    Route::apiResource('ads', AdController::class);
+    Route::patch('ads/{id}/toggle-status', [AdController::class, 'toggleStatus']);
+}); 
+
 // Public Mobile App Routes (Guest Mode)
 Route::prefix('mobile')->group(function () {
     // Public read-only endpoints for mobile app
@@ -96,6 +152,7 @@ Route::prefix('mobile')->group(function () {
     
     Route::get('reviews', [ReviewController::class, 'index']);
     Route::get('reviews/{id}', [ReviewController::class, 'show']);
+    Route::get('reviews/{type}/{elementId}', [ReviewController::class, 'getReviewsByTypeAndElement']);
     
     Route::get('diseases', [DiseaseController::class, 'index']);
     Route::get('diseases/{id}', [DiseaseController::class, 'show']);
@@ -103,52 +160,12 @@ Route::prefix('mobile')->group(function () {
     Route::get('remedy-types', [RemedyTypeController::class, 'index']);
     Route::get('remedy-types/{id}', [RemedyTypeController::class, 'show']);
     
+    Route::get('ads', [AdController::class, 'active']);
+    Route::get('home', [App\Http\Controllers\Mobile\HomeController::class, 'index']);
+    Route::get('learn', [App\Http\Controllers\Mobile\LearnController::class, 'index']);
+    
     // Contact Us - public submission endpoint
     Route::post('contact-us', [ContactUsController::class, 'store']);
     Route::get('contact-us', [ContactUsController::class, 'index']);
     Route::get('contact-us/{id}', [ContactUsController::class, 'show']);
 });
-
-// Protected Mobile Routes (Require Authentication)
-Route::prefix('mobile')->middleware('auth:sanctum')->group(function () {
-    // Favorites management
-    Route::post('favorites/add', [App\Http\Controllers\Mobile\FavoriteController::class, 'addToFavorites']);
-    Route::post('favorites/remove', [App\Http\Controllers\Mobile\FavoriteController::class, 'removeFromFavorites']);
-    Route::get('favorites', [App\Http\Controllers\Mobile\FavoriteController::class, 'getFavorites']);
-    Route::post('favorites/check', [App\Http\Controllers\Mobile\FavoriteController::class, 'checkFavorite']);
-});
-
-// Protected Routes (Admin Dashboard)
-Route::middleware('auth:sanctum')->group(function () {
-    // Place all routes that require authentication here
-    Route::apiResource('admins', AdminController::class);
-    Route::apiResource('body-systems', BodySystemController::class);
-    Route::patch('body-systems/{id}/toggle-status', [BodySystemController::class, 'toggleStatus']);
-    Route::apiResource('remedy-types', RemedyTypeController::class);
-    Route::patch('remedy-types/{id}/toggle-status', [RemedyTypeController::class, 'toggleStatus']);
-    Route::apiResource('remedies', RemedyController::class);
-    Route::patch('remedies/{id}/toggle-status', [RemedyController::class, 'toggleStatus']);
-    Route::apiResource('users', UserController::class);
-    Route::patch('users/{id}/toggle-status', [UserController::class, 'toggleStatus']);
-    Route::apiResource('articles', ArticleController::class);
-    Route::patch('articles/{id}/toggle-status', [ArticleController::class, 'toggleStatus']);
-    Route::apiResource('courses', CourseController::class);
-    Route::patch('courses/{id}/toggle-status', [CourseController::class, 'toggleStatus']);
-    Route::apiResource('videos', VideoController::class);
-    Route::patch('videos/{id}/toggle-status', [VideoController::class, 'toggleStatus']);
-    Route::apiResource('diseases', DiseaseController::class);
-    Route::patch('diseases/{id}/toggle-status', [DiseaseController::class, 'toggleStatus']);
-    Route::apiResource('faqs', FaqController::class);
-    Route::patch('faqs/{id}/toggle-status', [FaqController::class, 'toggleStatus']);
-    Route::apiResource('policies', PolicyController::class);
-    Route::patch('policies/{id}/toggle-status', [PolicyController::class, 'toggleStatus']);
-    Route::apiResource('reviews', ReviewController::class);
-    Route::patch('reviews/{id}/toggle-status', [ReviewController::class, 'toggleStatus']);
-    Route::apiResource('contact-us', ContactUsController::class);
-    Route::patch('contact-us/{id}/change-status', [ContactUsController::class, 'changeStatus']);
-    Route::apiResource('notifications', NotificationController::class);
-    Route::patch('notifications/{id}/mark-as-read', [NotificationController::class, 'markAsRead']);
-    Route::patch('notifications/{id}/archive', [NotificationController::class, 'archive']);
-    Route::apiResource('plans', PlanController::class)->only(['index', 'show']);
-    Route::apiResource('about', AboutController::class);
-}); 

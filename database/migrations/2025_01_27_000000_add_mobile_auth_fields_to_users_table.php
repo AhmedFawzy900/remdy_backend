@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             $table->string('phone')->nullable()->after('email');
-            $table->enum('account_verification', ['yes', 'no'])->default('no')->after('account_status');
+            $table->enum('account_verification', ['yes', 'no'])->default('no')->after('phone');
             $table->string('otp')->nullable()->after('account_verification');
             $table->string('otp_source')->nullable()->after('otp');
             $table->date('otp_expired_date')->nullable()->after('otp_source');

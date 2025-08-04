@@ -28,7 +28,9 @@ class RemedyResource extends JsonResource
             'id' => $this->id,
             'title' => $this->title,
             'main_image_url' => $this->main_image_url,
-            'disease' => $this->disease,
+            'disease' => $this->whenLoaded('diseaseRelation', function() {
+                return $this->diseaseRelation->name;
+            }, $this->getAttribute('disease')),
             'remedy_type' => new RemedyTypeResource($this->whenLoaded('remedyType')),
             'body_system' => new BodySystemResource($this->whenLoaded('bodySystem')),
             'description' => $this->description,
@@ -38,7 +40,8 @@ class RemedyResource extends JsonResource
             'instructions' => $this->instructions,
             'benefits' => $this->benefits,
             'precautions' => $this->precautions,
-            'reviews' => $reviews instanceof \Illuminate\Http\Resources\MissingValue ? [] : ReviewResource::collection($reviews),
+            'product_link' => $this->product_link,
+            'reviews' => $reviews instanceof \Illuminate\Http\Resources\MissingValue ? [] : ReviewResource::collection($reviews->take(2)),
             'average_rating' => $averageRating,
             'review_count' => $reviewCount,
             'created_at' => $this->created_at,

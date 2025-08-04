@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Article;
-use App\Http\Resources\ArticleResource;
-use App\Http\Resources\ArticleIndexResource;
+use App\Models\Ad;
+use App\Http\Resources\AdResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 
-class ArticleController extends Controller
+class AdController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -17,7 +16,7 @@ class ArticleController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Article::with(['reviews.user']);
+            $query = Ad::query();
 
             // Filter by title
             if ($request->has('title') && $request->title) {
@@ -29,18 +28,10 @@ class ArticleController extends Controller
                 $query->where('status', $request->status);
             }
 
-            // Filter by plan
-            if ($request->has('plan') && $request->plan) {
-                $query->whereJsonContains('plans', $request->plan);
-            }
-
             // General search
             if ($request->has('search') && $request->search) {
                 $search = $request->search;
-                $query->where(function($q) use ($search) {
-                    $q->where('title', 'like', '%' . $search . '%')
-                      ->orWhere('description', 'like', '%' . $search . '%');
-                });
+                $query->where('title', 'like', '%' . $search . '%');
             }
 
             // Sort by field
@@ -55,29 +46,37 @@ class ArticleController extends Controller
             $perPage = $request->get('per_page', 15);
             $perPage = min($perPage, 100); // Limit max per page to 100
             
-            $articles = $query->paginate($perPage);
+            $ads = $query->paginate($perPage);
 
             return response()->json([
                 'success' => true,
-                'data' => ArticleIndexResource::collection($articles),
+                'data' => AdResource::collection($ads),
                 'pagination' => [
-                    'current_page' => $articles->currentPage(),
-                    'last_page' => $articles->lastPage(),
-                    'per_page' => $articles->perPage(),
-                    'total' => $articles->total(),
-                    'from' => $articles->firstItem(),
-                    'to' => $articles->lastItem(),
-                    'has_more_pages' => $articles->hasMorePages(),
+                    'current_page' => $ads->currentPage(),
+                    'last_page' => $ads->lastPage(),
+                    'per_page' => $ads->perPage(),
+                    'total' => $ads->total(),
+                    'from' => $ads->firstItem(),
+                    'to' => $ads->lastItem(),
+                    'has_more_pages' => $ads->hasMorePages(),
                 ],
-                'message' => 'Articles retrieved successfully'
+                'message' => 'Ads retrieved successfully'
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve articles',
+                'message' => 'Failed to retrieve ads',
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create()
+    {
+        //
     }
 
     /**
@@ -89,13 +88,6 @@ class ArticleController extends Controller
             $validator = Validator::make($request->all(), [
                 'title' => 'required|string|max:255',
                 'image' => 'nullable|url',
-                'description' => 'required|string',
-                'plants' => 'nullable|array',
-                'plants.*.image' => 'nullable|url',
-                'plants.*.title' => 'required|string',
-                'plants.*.description' => 'required|string',
-                'plans' => 'nullable|array',
-                'plans.*' => 'string|in:basic,premium,pro',
                 'status' => 'sometimes|in:active,inactive',
             ]);
 
@@ -107,24 +99,21 @@ class ArticleController extends Controller
                 ], 422);
             }
 
-            $article = Article::create([
+            $ad = Ad::create([
                 'title' => $request->title,
                 'image' => $request->image,
-                'description' => $request->description,
-                'plants' => $request->plants,
-                'plans' => $request->plans,
-                'status' => $request->status ?? Article::STATUS_ACTIVE,
+                'status' => $request->status ?? Ad::STATUS_ACTIVE,
             ]);
 
             return response()->json([
                 'success' => true,
-                'data' => new ArticleResource($article),
-                'message' => 'Article created successfully'
+                'data' => new AdResource($ad),
+                'message' => 'Ad created successfully'
             ], 201);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create article',
+                'message' => 'Failed to create ad',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -136,27 +125,35 @@ class ArticleController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $article = Article::with(['reviews.user', 'reviews.reactions'])->find($id);
+            $ad = Ad::find($id);
             
-            if (!$article) {
+            if (!$ad) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Article not found'
+                    'message' => 'Ad not found'
                 ], 404);
             }
 
             return response()->json([
                 'success' => true,
-                'data' => new ArticleResource($article),
-                'message' => 'Article retrieved successfully'
+                'data' => new AdResource($ad),
+                'message' => 'Ad retrieved successfully'
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve article',
+                'message' => 'Failed to retrieve ad',
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit(string $id)
+    {
+        //
     }
 
     /**
@@ -165,25 +162,18 @@ class ArticleController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         try {
-            $article = Article::find($id);
+            $ad = Ad::find($id);
             
-            if (!$article) {
+            if (!$ad) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Article not found'
+                    'message' => 'Ad not found'
                 ], 404);
             }
 
             $validator = Validator::make($request->all(), [
                 'title' => 'sometimes|required|string|max:255',
                 'image' => 'nullable|url',
-                'description' => 'sometimes|required|string',
-                'plants' => 'nullable|array',
-                'plants.*.image' => 'nullable|url',
-                'plants.*.title' => 'required|string',
-                'plants.*.description' => 'required|string',
-                'plans' => 'nullable|array',
-                'plans.*' => 'string|in:basic,premium,pro',
                 'status' => 'sometimes|in:active,inactive',
             ]);
 
@@ -195,17 +185,17 @@ class ArticleController extends Controller
                 ], 422);
             }
 
-            $article->update($request->all());
+            $ad->update($request->all());
 
             return response()->json([
                 'success' => true,
-                'data' => new ArticleResource($article),
-                'message' => 'Article updated successfully'
+                'data' => new AdResource($ad),
+                'message' => 'Ad updated successfully'
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update article',
+                'message' => 'Failed to update ad',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -217,25 +207,25 @@ class ArticleController extends Controller
     public function destroy(string $id): JsonResponse
     {
         try {
-            $article = Article::find($id);
+            $ad = Ad::find($id);
             
-            if (!$article) {
+            if (!$ad) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Article not found'
+                    'message' => 'Ad not found'
                 ], 404);
             }
 
-            $article->delete();
+            $ad->delete();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Article deleted successfully'
+                'message' => 'Ad deleted successfully'
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete article',
+                'message' => 'Failed to delete ad',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -247,81 +237,54 @@ class ArticleController extends Controller
     public function toggleStatus(string $id): JsonResponse
     {
         try {
-            $article = Article::find($id);
+            $ad = Ad::find($id);
             
-            if (!$article) {
+            if (!$ad) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Article not found'
+                    'message' => 'Ad not found'
                 ], 404);
             }
 
-            $newStatus = $article->status === Article::STATUS_ACTIVE 
-                ? Article::STATUS_INACTIVE 
-                : Article::STATUS_ACTIVE;
+            $newStatus = $ad->status === Ad::STATUS_ACTIVE 
+                ? Ad::STATUS_INACTIVE 
+                : Ad::STATUS_ACTIVE;
 
-            $article->update(['status' => $newStatus]);
+            $ad->update(['status' => $newStatus]);
 
             return response()->json([
                 'success' => true,
-                'data' => new ArticleResource($article),
-                'message' => 'Article status toggled successfully'
+                'data' => new AdResource($ad),
+                'message' => 'Ad status toggled successfully'
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to toggle article status',
+                'message' => 'Failed to toggle ad status',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * Get featured articles for mobile app.
+     * Get active ads for mobile app.
      */
-    public function featured(): JsonResponse
+    public function active(): JsonResponse
     {
         try {
-            $articles = Article::where('status', 'active')
-                ->where('is_featured', true)
+            $ads = Ad::where('status', 'active')
                 ->orderBy('created_at', 'desc')
-                ->limit(10)
                 ->get();
 
             return response()->json([
                 'success' => true,
-                'data' => ArticleResource::collection($articles),
-                'message' => 'Featured articles retrieved successfully'
+                'data' => AdResource::collection($ads),
+                'message' => 'Active ads retrieved successfully'
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve featured articles',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Get latest articles for mobile app.
-     */
-    public function latest(): JsonResponse
-    {
-        try {
-            $articles = Article::where('status', 'active')
-                ->orderBy('created_at', 'desc')
-                ->limit(10)
-                ->get();
-
-            return response()->json([
-                'success' => true,
-                'data' => ArticleResource::collection($articles),
-                'message' => 'Latest articles retrieved successfully'
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve latest articles',
+                'message' => 'Failed to retrieve active ads',
                 'error' => $e->getMessage()
             ], 500);
         }

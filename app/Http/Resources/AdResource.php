@@ -5,7 +5,7 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class RemedyTypeResource extends JsonResource
+class AdResource extends JsonResource
 {
     /**
      * Transform the resource into an array.
@@ -16,11 +16,9 @@ class RemedyTypeResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'name' => $this->name,
-            'description' => $this->description,
+            'title' => $this->title,
             'image' => $this->image,
             'status' => $this->status,
-            'remedies_count' => $this->remedies_count ?? 0,
         ];
     }
 }

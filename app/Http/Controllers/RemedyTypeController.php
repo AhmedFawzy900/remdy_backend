@@ -44,6 +44,7 @@ class RemedyTypeController extends Controller
             $validator = Validator::make($request->all(), [
                 'name' => 'required|string|max:255',
                 'description' => 'required|string',
+                'image' => 'nullable|url',
                 'status' => 'sometimes|in:active,inactive',
             ]);
 
@@ -58,6 +59,7 @@ class RemedyTypeController extends Controller
             $remedyType = RemedyType::create([
                 'name' => $request->name,
                 'description' => $request->description,
+                'image' => $request->image,
                 'status' => $request->status ?? RemedyType::STATUS_ACTIVE,
             ]);
 
@@ -122,6 +124,7 @@ class RemedyTypeController extends Controller
             $validator = Validator::make($request->all(), [
                 'name' => 'sometimes|required|string|max:255',
                 'description' => 'sometimes|required|string',
+                'image' => 'nullable|url',
                 'status' => 'sometimes|in:active,inactive',
             ]);
 
@@ -133,7 +136,7 @@ class RemedyTypeController extends Controller
                 ], 422);
             }
 
-            $remedyType->update($request->only(['name', 'description', 'status']));
+            $remedyType->update($request->only(['name', 'description', 'image', 'status']));
 
             return response()->json([
                 'success' => true,

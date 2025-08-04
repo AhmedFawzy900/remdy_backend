@@ -22,6 +22,8 @@ class ReviewResource extends JsonResource
             'rate' => $this->rate,
             'message' => $this->message,
             'status' => $this->status,
+            'likes_count' => $this->likes_count ?? $this->likes()->count(),
+            'dislikes_count' => $this->dislikes_count ?? $this->dislikes()->count(),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
