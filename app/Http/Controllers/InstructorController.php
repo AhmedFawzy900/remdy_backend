@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Ad;
-use App\Http\Resources\AdResource;
+use App\Models\Instructor;
+use App\Http\Resources\InstructorResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 
-class AdController extends Controller
+class InstructorController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -16,11 +16,16 @@ class AdController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Ad::query();
+            $query = Instructor::with(['courses']);
 
-            // Filter by title
-            if ($request->has('title') && $request->title) {
-                $query->where('title', 'like', '%' . $request->title . '%');
+            // Filter by name
+            if ($request->has('name') && $request->name) {
+                $query->where('name', 'like', '%' . $request->name . '%');
+            }
+
+            // Filter by specialization
+            if ($request->has('specialization') && $request->specialization) {
+                $query->where('specialization', 'like', '%' . $request->specialization . '%');
             }
 
             // Filter by status
@@ -31,41 +36,44 @@ class AdController extends Controller
             // General search
             if ($request->has('search') && $request->search) {
                 $search = $request->search;
-                $query->where('title', 'like', '%' . $search . '%');
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', '%' . $search . '%')
+                      ->orWhere('description', 'like', '%' . $search . '%')
+                      ->orWhere('specialization', 'like', '%' . $search . '%')
+                      ->orWhere('bio', 'like', '%' . $search . '%');
+                });
             }
 
             // Sort by field
             $sortBy = $request->get('sort_by', 'created_at');
             $sortOrder = $request->get('sort_order', 'desc');
-            
-            if (in_array($sortBy, ['title', 'status', 'created_at', 'updated_at'])) {
+            if (in_array($sortBy, ['name', 'specialization', 'experience_years', 'status', 'created_at', 'updated_at'])) {
                 $query->orderBy($sortBy, $sortOrder);
             }
 
             // Pagination
             $perPage = $request->get('per_page', 15);
             $perPage = min($perPage, 100); // Limit max per page to 100
-            
-            $ads = $query->paginate($perPage);
+            $instructors = $query->paginate($perPage);
 
             return response()->json([
                 'success' => true,
-                'data' => AdResource::collection($ads),
+                'data' => InstructorResource::collection($instructors),
                 'pagination' => [
-                    'current_page' => $ads->currentPage(),
-                    'last_page' => $ads->lastPage(),
-                    'per_page' => $ads->perPage(),
-                    'total' => $ads->total(),
-                    'from' => $ads->firstItem(),
-                    'to' => $ads->lastItem(),
-                    'has_more_pages' => $ads->hasMorePages(),
+                    'current_page' => $instructors->currentPage(),
+                    'last_page' => $instructors->lastPage(),
+                    'per_page' => $instructors->perPage(),
+                    'total' => $instructors->total(),
+                    'from' => $instructors->firstItem(),
+                    'to' => $instructors->lastItem(),
+                    'has_more_pages' => $instructors->hasMorePages(),
                 ],
-                'message' => 'Ads retrieved successfully'
+                'message' => 'Instructors retrieved successfully'
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve ads',
+                'message' => 'Failed to retrieve instructors',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -86,9 +94,12 @@ class AdController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'title' => 'required|string|max:255',
+                'name' => 'required|string|max:255',
+                'description' => 'nullable|string',
                 'image' => 'nullable|url',
-                'url' => 'nullable|url',
+                'specialization' => 'nullable|string|max:255',
+                'experience_years' => 'nullable|integer|min:0',
+                'bio' => 'nullable|string',
                 'status' => 'sometimes|in:active,inactive',
             ]);
 
@@ -100,22 +111,25 @@ class AdController extends Controller
                 ], 422);
             }
 
-            $ad = Ad::create([
-                'title' => $request->title,
+            $instructor = Instructor::create([
+                'name' => $request->name,
+                'description' => $request->description,
                 'image' => $request->image,
-                'url' => $request->url,
-                'status' => $request->status ?? Ad::STATUS_ACTIVE,
+                'specialization' => $request->specialization,
+                'experience_years' => $request->experience_years,
+                'bio' => $request->bio,
+                'status' => $request->status ?? Instructor::STATUS_ACTIVE,
             ]);
 
             return response()->json([
                 'success' => true,
-                'data' => new AdResource($ad),
-                'message' => 'Ad created successfully'
+                'data' => new InstructorResource($instructor),
+                'message' => 'Instructor created successfully'
             ], 201);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create ad',
+                'message' => 'Failed to create instructor',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -127,24 +141,24 @@ class AdController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $ad = Ad::find($id);
+            $instructor = Instructor::with(['courses'])->find($id);
             
-            if (!$ad) {
+            if (!$instructor) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Ad not found'
+                    'message' => 'Instructor not found'
                 ], 404);
             }
 
             return response()->json([
                 'success' => true,
-                'data' => new AdResource($ad),
-                'message' => 'Ad retrieved successfully'
+                'data' => new InstructorResource($instructor),
+                'message' => 'Instructor retrieved successfully'
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve ad',
+                'message' => 'Failed to retrieve instructor',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -164,19 +178,22 @@ class AdController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         try {
-            $ad = Ad::find($id);
+            $instructor = Instructor::find($id);
             
-            if (!$ad) {
+            if (!$instructor) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Ad not found'
+                    'message' => 'Instructor not found'
                 ], 404);
             }
 
             $validator = Validator::make($request->all(), [
-                'title' => 'sometimes|required|string|max:255',
+                'name' => 'sometimes|required|string|max:255',
+                'description' => 'nullable|string',
                 'image' => 'nullable|url',
-                'url' => 'nullable|url',
+                'specialization' => 'nullable|string|max:255',
+                'experience_years' => 'nullable|integer|min:0',
+                'bio' => 'nullable|string',
                 'status' => 'sometimes|in:active,inactive',
             ]);
 
@@ -188,17 +205,17 @@ class AdController extends Controller
                 ], 422);
             }
 
-            $ad->update($request->all());
+            $instructor->update($request->all());
 
             return response()->json([
                 'success' => true,
-                'data' => new AdResource($ad),
-                'message' => 'Ad updated successfully'
+                'data' => new InstructorResource($instructor),
+                'message' => 'Instructor updated successfully'
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update ad',
+                'message' => 'Failed to update instructor',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -210,25 +227,25 @@ class AdController extends Controller
     public function destroy(string $id): JsonResponse
     {
         try {
-            $ad = Ad::find($id);
+            $instructor = Instructor::find($id);
             
-            if (!$ad) {
+            if (!$instructor) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Ad not found'
+                    'message' => 'Instructor not found'
                 ], 404);
             }
 
-            $ad->delete();
+            $instructor->delete();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Ad deleted successfully'
+                'message' => 'Instructor deleted successfully'
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete ad',
+                'message' => 'Failed to delete instructor',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -240,54 +257,54 @@ class AdController extends Controller
     public function toggleStatus(string $id): JsonResponse
     {
         try {
-            $ad = Ad::find($id);
+            $instructor = Instructor::find($id);
             
-            if (!$ad) {
+            if (!$instructor) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Ad not found'
+                    'message' => 'Instructor not found'
                 ], 404);
             }
 
-            $newStatus = $ad->status === Ad::STATUS_ACTIVE 
-                ? Ad::STATUS_INACTIVE 
-                : Ad::STATUS_ACTIVE;
+            $newStatus = $instructor->status === Instructor::STATUS_ACTIVE 
+                ? Instructor::STATUS_INACTIVE 
+                : Instructor::STATUS_ACTIVE;
 
-            $ad->update(['status' => $newStatus]);
+            $instructor->update(['status' => $newStatus]);
 
             return response()->json([
                 'success' => true,
-                'data' => new AdResource($ad),
-                'message' => 'Ad status toggled successfully'
+                'data' => new InstructorResource($instructor),
+                'message' => 'Instructor status toggled successfully'
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to toggle ad status',
+                'message' => 'Failed to toggle instructor status',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * Get active ads for mobile app.
+     * Get all active instructors for selection in course creation.
      */
-    public function active(): JsonResponse
+    public function forSelection(): JsonResponse
     {
         try {
-            $ads = Ad::where('status', 'active')
-                ->orderBy('created_at', 'desc')
+            $instructors = Instructor::where('status', 'active')
+                ->orderBy('name', 'asc')
                 ->get();
 
             return response()->json([
                 'success' => true,
-                'data' => AdResource::collection($ads),
-                'message' => 'Active ads retrieved successfully'
+                'data' => InstructorResource::collection($instructors),
+                'message' => 'Active instructors retrieved successfully'
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve active ads',
+                'message' => 'Failed to retrieve active instructors',
                 'error' => $e->getMessage()
             ], 500);
         }

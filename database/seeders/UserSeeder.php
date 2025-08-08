@@ -21,7 +21,7 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('password123'),
                 'profile_image' => 'https://example.com/images/john-smith.jpg',
                 'full_name' => 'John Michael Smith',
-                'subscription_plan' => User::PLAN_BASIC,
+                'subscription_plan' => User::PLAN_ROOKIE,
                 'account_status' => User::STATUS_ACTIVE,
             ],
             [
@@ -30,7 +30,7 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('password123'),
                 'profile_image' => 'https://example.com/images/sarah-johnson.jpg',
                 'full_name' => 'Sarah Elizabeth Johnson',
-                'subscription_plan' => User::PLAN_PREMIUM,
+                'subscription_plan' => User::PLAN_MASTER,
                 'account_status' => User::STATUS_ACTIVE,
             ],
             [
@@ -39,7 +39,7 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('password123'),
                 'profile_image' => 'https://example.com/images/mike-davis.jpg',
                 'full_name' => 'Michael Robert Davis',
-                'subscription_plan' => User::PLAN_PRO,
+                'subscription_plan' => User::PLAN_SKILLED,
                 'account_status' => User::STATUS_ACTIVE,
             ],
             [
@@ -48,7 +48,7 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('password123'),
                 'profile_image' => 'https://example.com/images/emily-wilson.jpg',
                 'full_name' => 'Emily Grace Wilson',
-                'subscription_plan' => User::PLAN_BASIC,
+                'subscription_plan' => User::PLAN_ROOKIE,
                 'account_status' => User::STATUS_INACTIVE,
             ],
             [
@@ -57,7 +57,7 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('password123'),
                 'profile_image' => 'https://example.com/images/david-brown.jpg',
                 'full_name' => 'David Christopher Brown',
-                'subscription_plan' => User::PLAN_PREMIUM,
+                'subscription_plan' => User::PLAN_MASTER,
                 'account_status' => User::STATUS_SUSPENDED,
             ],
             [
@@ -66,7 +66,7 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('password123'),
                 'profile_image' => 'https://example.com/images/lisa-garcia.jpg',
                 'full_name' => 'Lisa Maria Garcia',
-                'subscription_plan' => User::PLAN_BASIC,
+                'subscription_plan' => User::PLAN_ROOKIE,
                 'account_status' => User::STATUS_ACTIVE,
             ],
             [
@@ -75,7 +75,7 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('password123'),
                 'profile_image' => 'https://example.com/images/tom-anderson.jpg',
                 'full_name' => 'Thomas James Anderson',
-                'subscription_plan' => User::PLAN_PRO,
+                'subscription_plan' => User::PLAN_SKILLED,
                 'account_status' => User::STATUS_ACTIVE,
             ],
             [
@@ -84,7 +84,7 @@ class UserSeeder extends Seeder
                 'password' => Hash::make('password123'),
                 'profile_image' => 'https://example.com/images/jessica-lee.jpg',
                 'full_name' => 'Jessica Ann Lee',
-                'subscription_plan' => User::PLAN_PREMIUM,
+                'subscription_plan' => User::PLAN_MASTER,
                 'account_status' => User::STATUS_ACTIVE,
             ]
         ];

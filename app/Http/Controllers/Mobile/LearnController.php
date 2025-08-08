@@ -9,7 +9,10 @@ use App\Models\Course;
 use App\Models\Video;
 use App\Http\Resources\RemedyResource;
 use App\Http\Resources\ArticleResource;
+use App\Http\Resources\CourseIndexResource;
 use App\Http\Resources\CourseResource;
+use App\Http\Resources\RemedyIndexResource;
+use App\Http\Resources\VideoIndexResource;
 use App\Http\Resources\VideoResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -23,7 +26,7 @@ class LearnController extends Controller
     {
         try {
             // Get top rated remedies (by average rating)
-            $topRemedies = Remedy::with(['remedyType', 'bodySystem', 'reviews.user', 'reviews.reactions'])
+            $topRemedies = Remedy::with(['remedyType', 'bodySystem', 'reviews.user', 'reviews.reactions','diseaseRelation'])
                 ->where('status', 'active')
                 ->withAvg('reviews', 'rate')
                 ->orderBy('reviews_avg_rate', 'desc')
@@ -63,9 +66,9 @@ class LearnController extends Controller
                 'success' => true,
                 'data' => [
                     'personalized_suggestions' => $personalizedSuggestions,
-                    'top_remedies' => RemedyResource::collection($topRemedies),
-                    'top_courses' => CourseResource::collection($topCourses),
-                    'top_videos' => VideoResource::collection($topVideos),
+                    'top_remedies' => RemedyIndexResource::collection($topRemedies),
+                    'top_courses' => CourseIndexResource::collection($topCourses),
+                    'top_videos' => VideoIndexResource::collection($topVideos),
                     'latest_articles' => ArticleResource::collection($latestArticles),
                 ],
                 'message' => 'Learning content retrieved successfully'
@@ -90,7 +93,7 @@ class LearnController extends Controller
         if ($topCourses->isNotEmpty()) {
             $suggestions[] = [
                 'type' => 'course',
-                'data' => new CourseResource($topCourses->first())
+                'data' => new CourseIndexResource($topCourses->first())
             ];
         }
 
@@ -98,7 +101,7 @@ class LearnController extends Controller
         if ($topRemedies->isNotEmpty()) {
             $suggestions[] = [
                 'type' => 'remedy',
-                'data' => new RemedyResource($topRemedies->first())
+                'data' => new RemedyIndexResource($topRemedies->first())
             ];
         }
 
@@ -106,7 +109,7 @@ class LearnController extends Controller
         if ($topVideos->isNotEmpty()) {
             $suggestions[] = [
                 'type' => 'video',
-                'data' => new VideoResource($topVideos->first())
+                'data' => new VideoIndexResource($topVideos->first())
             ];
         }
 

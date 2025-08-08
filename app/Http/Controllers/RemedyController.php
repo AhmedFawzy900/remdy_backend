@@ -174,7 +174,13 @@ class RemedyController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $remedy = Remedy::with(['remedyType', 'bodySystem', 'diseaseRelation', 'reviews.user', 'reviews.reactions'])->find($id);
+            $remedy = Remedy::with([
+                'remedyType', 
+                'bodySystem', 
+                'diseaseRelation', 
+                'reviews.user', 
+                'reviews.reactions'
+            ])->find($id);
             
             if (!$remedy) {
                 return response()->json([
@@ -196,6 +202,45 @@ class RemedyController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve remedy',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Show remedy for mobile dashboard with full relationship data.
+     */
+    public function showForDashboard(string $id): JsonResponse
+    {
+        try {
+            $remedy = Remedy::with([
+                'remedyType', 
+                'bodySystem', 
+                'diseaseRelation', 
+                'reviews.user', 
+                'reviews.reactions',
+                'diseaseRelation'
+            ])->find($id);
+            
+            if (!$remedy) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Remedy not found'
+                ], 404);
+            }
+
+            // Get related remedies from the same category with similar names
+            $relatedRemedies = $this->getRelatedRemedies($remedy);
+
+            return response()->json([
+                'success' => true,
+                'data' => new \App\Http\Resources\RemedyDashboardResource($remedy),
+                'message' => 'Remedy retrieved successfully for dashboard'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve remedy for dashboard',
                 'error' => $e->getMessage()
             ], 500);
         }

@@ -13,13 +13,48 @@ class AboutController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         try {
-            $abouts = About::all();
+            $query = About::query();
+
+            // Filter by main_description
+            if ($request->has('main_description') && $request->main_description) {
+                $query->where('main_description', 'like', '%' . $request->main_description . '%');
+            }
+
+            // General search
+            if ($request->has('search') && $request->search) {
+                $search = $request->search;
+                $query->where('main_description', 'like', '%' . $search . '%');
+            }
+
+            // Sort by field
+            $sortBy = $request->get('sort_by', 'created_at');
+            $sortOrder = $request->get('sort_order', 'desc');
+            
+            if (in_array($sortBy, ['main_description', 'created_at', 'updated_at'])) {
+                $query->orderBy($sortBy, $sortOrder);
+            }
+
+            // Pagination
+            $perPage = $request->get('per_page', 15);
+            $perPage = min($perPage, 100); // Limit max per page to 100
+            
+            $abouts = $query->paginate($perPage);
+
             return response()->json([
                 'success' => true,
                 'data' => AboutResource::collection($abouts),
+                'pagination' => [
+                    'current_page' => $abouts->currentPage(),
+                    'last_page' => $abouts->lastPage(),
+                    'per_page' => $abouts->perPage(),
+                    'total' => $abouts->total(),
+                    'from' => $abouts->firstItem(),
+                    'to' => $abouts->lastItem(),
+                    'has_more_pages' => $abouts->hasMorePages(),
+                ],
                 'message' => 'About data retrieved successfully'
             ], 200);
         } catch (\Exception $e) {

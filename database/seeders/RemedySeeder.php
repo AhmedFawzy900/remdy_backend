@@ -18,7 +18,7 @@ class RemedySeeder extends Seeder
                 'title' => 'Ginger Tea for Cold Relief',
                 'main_image_url' => 'https://example.com/images/ginger-tea.jpg',
                 'disease' => 'Common Cold',
-                'disease_id' => null, // Will be set to null for now since Common Cold is not in diseases table
+                'disease_id' => 4, // Common Cold disease ID
                 'remedy_type_id' => 1, // Herbal Remedies
                 'body_system_id' => 4, // Respiratory System
                 'description' => 'A natural remedy using ginger to help relieve cold symptoms and boost immunity.',
@@ -82,7 +82,7 @@ class RemedySeeder extends Seeder
                 'title' => 'Turmeric Milk for Joint Pain',
                 'main_image_url' => 'https://example.com/images/turmeric-milk.jpg',
                 'disease' => 'Joint Pain',
-                'disease_id' => null, // Will be set to null for now since Joint Pain is not in diseases table
+                'disease_id' => 5, // Joint Pain disease ID
                 'remedy_type_id' => 3, // Ayurvedic Remedies
                 'body_system_id' => 5, // Musculoskeletal System
                 'description' => 'Traditional Ayurvedic remedy using turmeric and milk to reduce joint inflammation and pain.',
@@ -146,7 +146,7 @@ class RemedySeeder extends Seeder
                 'title' => 'Lavender Oil for Anxiety',
                 'main_image_url' => 'https://example.com/images/lavender-oil.jpg',
                 'disease' => 'Anxiety',
-                'disease_id' => null, // Will be set to null for now since Anxiety is not in diseases table
+                'disease_id' => 6, // Anxiety disease ID
                 'remedy_type_id' => 5, // Essential Oils
                 'body_system_id' => 2, // Nervous System
                 'description' => 'Aromatherapy using lavender essential oil to promote relaxation and reduce anxiety.',

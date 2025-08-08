@@ -149,4 +149,12 @@ class User extends Authenticatable
         return $this->belongsToMany(Video::class, 'favorites', 'user_id', 'favoritable_id')
             ->where('favoritable_type', Video::class);
     }
+
+    /**
+     * Get the user's reminders.
+     */
+    public function reminders()
+    {
+        return $this->hasMany(Reminder::class);
+    }
 }

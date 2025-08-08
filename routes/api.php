@@ -21,6 +21,8 @@ use App\Http\Controllers\ImageUploadController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\AdController;
+use App\Http\Controllers\InstructorController;
+use App\Http\Controllers\LessonController;
 
 /*
 |--------------------------------------------------------------------------
@@ -57,7 +59,9 @@ Route::prefix('mobile/auth')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('profile', [App\Http\Controllers\Mobile\AuthController::class, 'userProfile']);
         Route::post('profile', [App\Http\Controllers\Mobile\AuthController::class, 'updateProfile']);
+        Route::post('password', [App\Http\Controllers\Mobile\AuthController::class, 'updatePassword']);
         Route::post('logout', [App\Http\Controllers\Mobile\AuthController::class, 'logout']);
+        Route::delete('account', [App\Http\Controllers\Mobile\AuthController::class, 'deleteAccount']);
     });
 });
 
@@ -78,6 +82,14 @@ Route::prefix('mobile')->middleware('auth:sanctum')->group(function () {
     Route::post('reviews/{id}/like', [ReviewController::class, 'likeReview']);
     Route::post('reviews/{id}/dislike', [ReviewController::class, 'dislikeReview']);
     Route::get('reviews/{id}/user-reaction', [ReviewController::class, 'getUserReaction']);
+    
+    // Reminders management
+    Route::post('reminders', [App\Http\Controllers\Mobile\ReminderController::class, 'create']);
+    Route::get('reminders', [App\Http\Controllers\Mobile\ReminderController::class, 'index']);
+    Route::put('reminders/{id}', [App\Http\Controllers\Mobile\ReminderController::class, 'update']);
+    Route::delete('reminders/{id}', [App\Http\Controllers\Mobile\ReminderController::class, 'destroy']);
+    Route::delete('reminders', [App\Http\Controllers\Mobile\ReminderController::class, 'deleteAll']);
+    Route::patch('reminders/{id}/toggle', [App\Http\Controllers\Mobile\ReminderController::class, 'toggleStatus']);
 });
 
 // Protected Routes (Admin Dashboard)
@@ -90,6 +102,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('remedy-types/{id}/toggle-status', [RemedyTypeController::class, 'toggleStatus']);
     Route::apiResource('remedies', RemedyController::class);
     Route::patch('remedies/{id}/toggle-status', [RemedyController::class, 'toggleStatus']);
+    Route::get('remedies/{id}/dashboard', [RemedyController::class, 'showForDashboard']);
     Route::apiResource('users', UserController::class);
     Route::patch('users/{id}/toggle-status', [UserController::class, 'toggleStatus']);
     Route::apiResource('articles', ArticleController::class);
@@ -117,6 +130,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('about', AboutController::class);
     Route::apiResource('ads', AdController::class);
     Route::patch('ads/{id}/toggle-status', [AdController::class, 'toggleStatus']);
+    Route::apiResource('instructors', InstructorController::class);
+    Route::patch('instructors/{id}/toggle-status', [InstructorController::class, 'toggleStatus']);
+    Route::get('instructors/for-selection', [InstructorController::class, 'forSelection']);
+    Route::apiResource('lessons', LessonController::class);
+    Route::patch('lessons/{id}/toggle-status', [LessonController::class, 'toggleStatus']);
+    Route::get('courses/{courseId}/lessons', [LessonController::class, 'byCourse']);
 }); 
 
 // Public Mobile App Routes (Guest Mode)

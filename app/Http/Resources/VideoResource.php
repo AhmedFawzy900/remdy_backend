@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Auth;
 
 class VideoResource extends JsonResource
 {
@@ -24,7 +25,7 @@ class VideoResource extends JsonResource
             $reviewCount = $reviews->count();
         }
 
-        return [
+        $data = [
             'id' => $this->id,
             'image' => $this->image,
             'videoLink' => $this->videoLink,
@@ -41,5 +42,26 @@ class VideoResource extends JsonResource
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
+
+        // Add is_fav field - always present
+        $user = null;
+        if ($request->bearerToken()) {
+            try {
+                $user = \Laravel\Sanctum\PersonalAccessToken::findToken($request->bearerToken())->tokenable;
+            } catch (\Exception $e) {
+                $user = null;
+            }
+        }
+        
+        if ($user) {
+            $data['is_fav'] = \App\Models\Favorite::where('user_id', $user->id)
+                ->where('favoritable_type', 'video')
+                ->where('favoritable_id', $this->id)
+                ->exists();
+        } else {
+            $data['is_fav'] = false;
+        }
+
+        return $data;
     }
 }

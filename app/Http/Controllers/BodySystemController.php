@@ -13,17 +13,56 @@ class BodySystemController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         try {
             $query = BodySystem::query();
-            if (request()->has('title') && request('title')) {
-                $query->where('title', 'like', '%' . request('title') . '%');
+
+            // Filter by title
+            if ($request->has('title') && $request->title) {
+                $query->where('title', 'like', '%' . $request->title . '%');
             }
-            $bodySystems = $query->get();
+
+            // Filter by status
+            if ($request->has('status') && $request->status) {
+                $query->where('status', $request->status);
+            }
+
+            // General search
+            if ($request->has('search') && $request->search) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('title', 'like', '%' . $search . '%')
+                      ->orWhere('description', 'like', '%' . $search . '%');
+                });
+            }
+
+            // Sort by field
+            $sortBy = $request->get('sort_by', 'created_at');
+            $sortOrder = $request->get('sort_order', 'desc');
+            
+            if (in_array($sortBy, ['title', 'status', 'created_at', 'updated_at'])) {
+                $query->orderBy($sortBy, $sortOrder);
+            }
+
+            // Pagination
+            $perPage = $request->get('per_page', 15);
+            $perPage = min($perPage, 100); // Limit max per page to 100
+            
+            $bodySystems = $query->paginate($perPage);
+
             return response()->json([
                 'success' => true,
                 'data' => BodySystemResource::collection($bodySystems),
+                'pagination' => [
+                    'current_page' => $bodySystems->currentPage(),
+                    'last_page' => $bodySystems->lastPage(),
+                    'per_page' => $bodySystems->perPage(),
+                    'total' => $bodySystems->total(),
+                    'from' => $bodySystems->firstItem(),
+                    'to' => $bodySystems->lastItem(),
+                    'has_more_pages' => $bodySystems->hasMorePages(),
+                ],
                 'message' => 'Body systems retrieved successfully'
             ], 200);
         } catch (\Exception $e) {

@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             $table->string('profile_image')->nullable()->after('email');
             $table->string('full_name')->after('profile_image');
-            $table->enum('subscription_plan', ['basic', 'premium', 'pro'])->default('basic')->after('full_name');
+            $table->string('subscription_plan')->default('rookie')->after('full_name');
             $table->enum('account_status', ['active', 'inactive', 'suspended'])->default('active')->after('subscription_plan');
         });
     }

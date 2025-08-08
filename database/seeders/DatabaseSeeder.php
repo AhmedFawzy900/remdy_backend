@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
             RemedyTypeSeeder::class,
             RemedySeeder::class,
             UserSeeder::class,
+            InstructorSeeder::class,
             ArticleSeeder::class,
             CourseSeeder::class,
             VideoSeeder::class,
@@ -39,6 +40,7 @@ class DatabaseSeeder extends Seeder
             NotificationSeeder::class,
             PlanSeeder::class,
             AdSeeder::class,
+            LessonSeeder::class,
         ]);
     }
 }

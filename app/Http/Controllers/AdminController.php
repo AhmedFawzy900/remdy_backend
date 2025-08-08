@@ -14,17 +14,62 @@ class AdminController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         try {
             $query = Admin::query();
-            if (request()->has('name') && request('name')) {
-                $query->where('name', 'like', '%' . request('name') . '%');
+
+            // Filter by name
+            if ($request->has('name') && $request->name) {
+                $query->where('name', 'like', '%' . $request->name . '%');
             }
-            $admins = $query->get();
+
+            // Filter by email
+            if ($request->has('email') && $request->email) {
+                $query->where('email', 'like', '%' . $request->email . '%');
+            }
+
+            // Filter by phone
+            if ($request->has('phone') && $request->phone) {
+                $query->where('phone', 'like', '%' . $request->phone . '%');
+            }
+
+            // General search
+            if ($request->has('search') && $request->search) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', '%' . $search . '%')
+                      ->orWhere('email', 'like', '%' . $search . '%')
+                      ->orWhere('phone', 'like', '%' . $search . '%');
+                });
+            }
+
+            // Sort by field
+            $sortBy = $request->get('sort_by', 'created_at');
+            $sortOrder = $request->get('sort_order', 'desc');
+            
+            if (in_array($sortBy, ['name', 'email', 'phone', 'created_at', 'updated_at'])) {
+                $query->orderBy($sortBy, $sortOrder);
+            }
+
+            // Pagination
+            $perPage = $request->get('per_page', 15);
+            $perPage = min($perPage, 100); // Limit max per page to 100
+            
+            $admins = $query->paginate($perPage);
+
             return response()->json([
                 'success' => true,
                 'data' => AdminResource::collection($admins),
+                'pagination' => [
+                    'current_page' => $admins->currentPage(),
+                    'last_page' => $admins->lastPage(),
+                    'per_page' => $admins->perPage(),
+                    'total' => $admins->total(),
+                    'from' => $admins->firstItem(),
+                    'to' => $admins->lastItem(),
+                    'has_more_pages' => $admins->hasMorePages(),
+                ],
                 'message' => 'Admins retrieved successfully'
             ], 200);
         } catch (\Exception $e) {

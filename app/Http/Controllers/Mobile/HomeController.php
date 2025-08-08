@@ -9,9 +9,12 @@ use App\Models\Remedy;
 use App\Models\Course;
 use App\Models\Video;
 use App\Http\Resources\AdResource;
+use App\Http\Resources\CourseIndexResource;
 use App\Http\Resources\RemedyTypeResource;
 use App\Http\Resources\RemedyResource;
 use App\Http\Resources\CourseResource;
+use App\Http\Resources\RemedyIndexResource;
+use App\Http\Resources\VideoIndexResource;
 use App\Http\Resources\VideoResource;
 use Illuminate\Http\JsonResponse;
 
@@ -39,7 +42,7 @@ class HomeController extends Controller
             ->get();
 
             // Get latest remedies
-            $remedies = Remedy::with(['reviews.user'])->where('status', 'active')
+            $remedies = Remedy::with(['reviews.user','remedyType','bodySystem','diseaseRelation'])->where('status', 'active')
                 ->orderBy('created_at', 'desc')
                 ->limit(10)
                 ->get();
@@ -61,9 +64,9 @@ class HomeController extends Controller
                 'data' => [
                     'ads' => AdResource::collection($ads),
                     'remedy_types' => RemedyTypeResource::collection($remedyTypes),
-                    'remedies' => RemedyResource::collection($remedies),
-                    'courses' => CourseResource::collection($courses),
-                    'videos' => VideoResource::collection($videos),
+                    'remedies' => RemedyIndexResource::collection($remedies),
+                    'courses' => CourseIndexResource::collection($courses),
+                    'videos' => VideoIndexResource::collection($videos),
                 ],
                 'message' => 'Home page data retrieved successfully'
             ], 200);

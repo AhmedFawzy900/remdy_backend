@@ -61,7 +61,7 @@ class FavoriteController extends Controller
 
             // Check if already favorited
             $existingFavorite = Favorite::where('user_id', $user->id)
-                ->where('favoritable_type', $modelClass)
+                ->where('favoritable_type',$type)
                 ->where('favoritable_id', $itemId)
                 ->first();
 
@@ -75,7 +75,7 @@ class FavoriteController extends Controller
             // Add to favorites
             Favorite::create([
                 'user_id' => $user->id,
-                'favoritable_type' => $modelClass,
+                'favoritable_type' => $type,
                 'favoritable_id' => $itemId,
             ]);
 
@@ -127,7 +127,7 @@ class FavoriteController extends Controller
 
             // Find and delete the favorite
             $favorite = Favorite::where('user_id', $user->id)
-                ->where('favoritable_type', $modelClass)
+                ->where('favoritable_type', $type)
                 ->where('favoritable_id', $itemId)
                 ->first();
 
@@ -232,7 +232,7 @@ class FavoriteController extends Controller
             $modelClass = $modelMap[$type];
 
             $isFavorited = Favorite::where('user_id', $user->id)
-                ->where('favoritable_type', $modelClass)
+                ->where('favoritable_type', $type)
                 ->where('favoritable_id', $itemId)
                 ->exists();
 
@@ -290,7 +290,7 @@ class FavoriteController extends Controller
 
                 $modelClass = $modelMap[$type];
                 $deletedCount = Favorite::where('user_id', $user->id)
-                    ->where('favoritable_type', $modelClass)
+                    ->where('favoritable_type', $type)
                     ->delete();
 
                 return response()->json([

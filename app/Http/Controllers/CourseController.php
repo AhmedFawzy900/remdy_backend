@@ -17,7 +17,7 @@ class CourseController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Course::with(['reviews.user']);
+            $query = Course::with(['reviews.user', 'instructors']);
 
             // Filter by title
             if ($request->has('title') && $request->title) {
@@ -56,12 +56,7 @@ class CourseController extends Controller
             $perPage = min($perPage, 100); // Limit max per page to 100
             $courses = $query->paginate($perPage);
             
-            // Manually load remedies for each course
-            $courses->getCollection()->transform(function ($course) {
-                $remedyIds = $course->selectedRemedies ?? [];
-                $course->remedies = \App\Models\Remedy::with(['reviews.user'])->whereIn('id', $remedyIds)->get();
-                return $course;
-            });
+            // Remedies are automatically loaded via the relationship
 
             return response()->json([
                 'success' => true,
@@ -104,10 +99,8 @@ class CourseController extends Controller
                 'courseContent' => 'nullable|array',
                 'courseContent.*.title' => 'required|string',
                 'courseContent.*.image' => 'nullable|url',
-                'instructors' => 'nullable|array',
-                'instructors.*.name' => 'required|string',
-                'instructors.*.description' => 'nullable|string',
-                'instructors.*.image' => 'nullable|url',
+                'instructor_ids' => 'nullable|array',
+                'instructor_ids.*' => 'exists:instructors,id',
                 'selectedRemedies' => 'nullable|array',
                 'selectedRemedies.*' => 'string',
                 'relatedCourses' => 'nullable|array',
@@ -136,11 +129,15 @@ class CourseController extends Controller
                 ], 422);
             }
 
-            $course = Course::create($request->all());
+            $courseData = $request->except('instructor_ids');
+            $course = Course::create($courseData);
             
-            // Manually load remedies
-            $remedyIds = $course->selectedRemedies ?? [];
-            $course->remedies = \App\Models\Remedy::with(['reviews.user'])->whereIn('id', $remedyIds)->get();
+            // Attach instructors if provided
+            if ($request->has('instructor_ids') && is_array($request->instructor_ids)) {
+                $course->instructors()->attach($request->instructor_ids);
+            }
+            
+            // Remedies are automatically loaded via the relationship
 
             return response()->json([
                 'success' => true,
@@ -162,7 +159,7 @@ class CourseController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $course = Course::with(['reviews.user', 'reviews.reactions'])->find($id);
+            $course = Course::with(['reviews.user', 'reviews.reactions', 'instructors'])->find($id);
             
             if (!$course) {
                 return response()->json([
@@ -171,9 +168,7 @@ class CourseController extends Controller
                 ], 404);
             }
             
-            // Manually load remedies
-            $remedyIds = $course->selectedRemedies ?? [];
-            $course->remedies = \App\Models\Remedy::with(['reviews.user'])->whereIn('id', $remedyIds)->get();
+            // Remedies are automatically loaded via the relationship
 
             return response()->json([
                 'success' => true,
@@ -214,10 +209,8 @@ class CourseController extends Controller
                 'courseContent' => 'nullable|array',
                 'courseContent.*.title' => 'required|string',
                 'courseContent.*.image' => 'nullable|url',
-                'instructors' => 'nullable|array',
-                'instructors.*.name' => 'required|string',
-                'instructors.*.description' => 'nullable|string',
-                'instructors.*.image' => 'nullable|url',
+                'instructor_ids' => 'nullable|array',
+                'instructor_ids.*' => 'exists:instructors,id',
                 'selectedRemedies' => 'nullable|array',
                 'selectedRemedies.*' => 'string',
                 'relatedCourses' => 'nullable|array',
@@ -244,11 +237,15 @@ class CourseController extends Controller
                     'errors' => $validator->errors()
                 ], 422);
             }
-            $course->update($request->all());
+            $courseData = $request->except('instructor_ids');
+            $course->update($courseData);
             
-            // Manually load remedies
-            $remedyIds = $course->selectedRemedies ?? [];
-            $course->remedies = \App\Models\Remedy::with(['reviews.user'])->whereIn('id', $remedyIds)->get();
+            // Sync instructors if provided
+            if ($request->has('instructor_ids')) {
+                $course->instructors()->sync($request->instructor_ids ?? []);
+            }
+            
+            // Remedies are automatically loaded via the relationship
 
             return response()->json([
                 'success' => true,
@@ -334,12 +331,7 @@ class CourseController extends Controller
                 ->limit(10)
                 ->get();
 
-            // Manually load remedies for each course
-            $courses->transform(function ($course) {
-                $remedyIds = $course->selectedRemedies ?? [];
-                $course->remedies = \App\Models\Remedy::with(['reviews.user'])->whereIn('id', $remedyIds)->get();
-                return $course;
-            });
+            // Remedies are automatically loaded via the relationship
 
             return response()->json([
                 'success' => true,
@@ -366,12 +358,7 @@ class CourseController extends Controller
                 ->limit(10)
                 ->get();
 
-            // Manually load remedies for each course
-            $courses->transform(function ($course) {
-                $remedyIds = $course->selectedRemedies ?? [];
-                $course->remedies = \App\Models\Remedy::with(['reviews.user'])->whereIn('id', $remedyIds)->get();
-                return $course;
-            });
+            // Remedies are automatically loaded via the relationship
 
             return response()->json([
                 'success' => true,

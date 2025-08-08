@@ -293,8 +293,7 @@ class AuthController extends Controller
         $user = $this->checkEmail($email);
 
         if ($user->otp == $code && 
-            Carbon::now()->toDateString() <= $user->otp_expired_date && 
-            $user->code_usage !== 'done' && 
+            Carbon::now()->toDateString() <= $user->otp_expired_date &&
             $user->otp_source === $key) {
 
             $input = ['code_usage' => 'done'];
@@ -428,7 +427,6 @@ class AuthController extends Controller
                 'full_name' => 'sometimes|string|max:255',
                 'phone' => 'sometimes|string|max:20',
                 'email' => 'sometimes|email|unique:users,email,' . $user->id,
-                'password' => 'sometimes|string|min:6',
                 'profile_image' => 'sometimes|url',
             ]);
 
@@ -441,11 +439,6 @@ class AuthController extends Controller
             }
 
             $input = $request->only(['name', 'full_name', 'phone', 'email', 'profile_image']);
-            
-            if ($request->password) {
-                $input['password'] = Hash::make($request->password);
-            }
-
             $user->update($input);
 
             return response()->json([
@@ -457,6 +450,61 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update profile',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update user password.
+     */
+    public function updatePassword(Request $request): JsonResponse
+    {
+        try {
+            $user = auth('sanctum')->user();
+            
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'old_password' => 'required|string',
+                'new_password' => 'required|string|min:6',
+                'confirm_password' => 'required|string|same:new_password',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // Check if old password is correct
+            if (!Hash::check($request->old_password, $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Old password is incorrect'
+                ], 400);
+            }
+
+            // Update password
+            $user->update([
+                'password' => Hash::make($request->new_password)
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Password updated successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update password',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -482,6 +530,75 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Logout failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete user account.
+     */
+    public function deleteAccount(Request $request): JsonResponse
+    {
+        try {
+            $user = auth('sanctum')->user();
+            
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'password' => 'required|string',
+                'confirm_delete' => 'required|string|in:DELETE',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // Check if password is correct
+            if (!Hash::check($request->password, $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Password is incorrect'
+                ], 400);
+            }
+
+            // Check if user confirmed deletion
+            if ($request->confirm_delete !== 'DELETE') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Please type DELETE to confirm account deletion'
+                ], 400);
+            }
+
+            // Delete user's tokens first
+            $user->tokens()->delete();
+
+            // Delete user's reminders
+            $user->reminders()->delete();
+
+            // Delete user's favorites
+            $user->favorites()->delete();
+
+            // Delete the user account
+            $user->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Account deleted successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete account',
                 'error' => $e->getMessage()
             ], 500);
         }
