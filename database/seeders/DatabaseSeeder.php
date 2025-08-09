@@ -42,6 +42,8 @@ class DatabaseSeeder extends Seeder
             AdSeeder::class,
             LessonSeeder::class,
             LessonContentBlockSeeder::class,
+            CoursePurchaseSeeder::class,
+            LessonProgressSeeder::class,
         ]);
     }
 }

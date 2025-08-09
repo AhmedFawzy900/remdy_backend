@@ -157,4 +157,20 @@ class User extends Authenticatable
     {
         return $this->hasMany(Reminder::class);
     }
+
+    /**
+     * Get course purchases for this user.
+     */
+    public function coursePurchases()
+    {
+        return $this->hasMany(CoursePurchase::class);
+    }
+
+    /**
+     * Get lesson progress for this user.
+     */
+    public function lessonProgress()
+    {
+        return $this->hasMany(LessonProgress::class);
+    }
 }

@@ -1,13 +1,22 @@
 <?php
 
-namespace App\Http\Resources;
+namespace App\Http\Resources\Mobile;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Auth;
 
-class CourseResource extends JsonResource
+class CourseDetailResource extends JsonResource
 {
+    private $purchase;
+    private $started;
+
+    public function __construct($resource, $purchase = null, $started = false)
+    {
+        parent::__construct($resource);
+        $this->purchase = $purchase;
+        $this->started = $started;
+    }
+
     /**
      * Transform the resource into an array.
      *
@@ -15,39 +24,31 @@ class CourseResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        // Calculate average rating and review count
-        $reviews = $this->whenLoaded('reviews');
-        $averageRating = 0;
-        $reviewCount = 0;
-        
-        if ($reviews && !$reviews instanceof \Illuminate\Http\Resources\MissingValue && $reviews->count() > 0) {
-            $averageRating = round($reviews->avg('rate'), 1);
-            $reviewCount = $reviews->count();
-        }
-
         $data = [
             'id' => $this->id,
             'image' => $this->image,
             'title' => $this->title,
             'description' => $this->description,
             'duration' => $this->duration,
-            'sessionsNumber' => $this->sessionsNumber,
+            'sessionsNumber' => $this->sessionsNumber ?? null,
             'price' => $this->price,
-            'plan' => $this->plan,
-            'overview' => $this->overview,
-            'courseContent' => $this->courseContent,
+            'plan' => $this->plan ?? null,
+            'overview' => $this->overview ?? null,
+            'courseContent' => $this->courseContent ?? null,
             'instructors' => $this->whenLoaded('instructors', function () {
-                return InstructorResource::collection($this->instructors);
+                return $this->instructors;
             }),
-
-            'remedies' => $this->remedies ? RemedyIndexResource::collection($this->remedies) : [],
-            'relatedCourses' => CourseIndexResource::collection($this->relatedCourses),
+            'remedies' => $this->remedies ?? [],
+            'relatedCourses' => $this->relatedCourses ?? [],
             'status' => $this->status,
-            'reviews' => $reviews instanceof \Illuminate\Http\Resources\MissingValue ? [] : ReviewResource::collection($reviews->take(2)),
-            'average_rating' => $averageRating,
-            'review_count' => $reviewCount,
+            'reviews' => $this->reviews ?? [],
+            'average_rating' => $this->rating ?? 0,
+            'review_count' => $this->reviews ? $this->reviews->count() : 0,
+            'lessons_count' => $this->lessons->count(),
+            'purchase_status' => !is_null($this->purchase),
+            'is_started' => $this->started,
+            'can_access' => !is_null($this->purchase),
            
-            
         ];
 
         // Add is_fav field - always present
@@ -71,4 +72,4 @@ class CourseResource extends JsonResource
 
         return $data;
     }
-}
+} 

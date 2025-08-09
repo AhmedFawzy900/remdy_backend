@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Course extends Model
 {
@@ -53,6 +54,30 @@ class Course extends Model
         return $this->hasMany(Lesson::class)->ordered();
     }
 
+    /**
+     * Get the instructor for this course (first instructor).
+     */
+    public function getInstructorAttribute()
+    {
+        return $this->instructors->first();
+    }
+
+    /**
+     * Get course purchases.
+     */
+    public function purchases()
+    {
+        return $this->hasMany(CoursePurchase::class);
+    }
+
+    /**
+     * Get lesson progress for a specific user.
+     */
+    public function lessonProgress()
+    {
+        return $this->hasMany(LessonProgress::class);
+    }
+
     public function reviews()
     {
         return $this->hasMany(Review::class, 'element_id')->where('type', 'course')->where('status', 'accepted');
@@ -83,7 +108,7 @@ class Course extends Model
     public function getRelatedCoursesAttribute()
     {
         // Get instructor IDs for this course
-        $instructorIds = $this->instructors()->pluck('instructors.id')->toArray();
+        $instructorIds = $this->instructors ? $this->instructors->pluck('id')->toArray() : [];
         
         // Find related courses based on multiple criteria
         $relatedCourses = Course::where('id', '!=', $this->id)

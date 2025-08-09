@@ -90,6 +90,21 @@ Route::prefix('mobile')->middleware('auth:sanctum')->group(function () {
     Route::delete('reminders/{id}', [App\Http\Controllers\Mobile\ReminderController::class, 'destroy']);
     Route::delete('reminders', [App\Http\Controllers\Mobile\ReminderController::class, 'deleteAll']);
     Route::patch('reminders/{id}/toggle', [App\Http\Controllers\Mobile\ReminderController::class, 'toggleStatus']);
+    
+    // Mobile Course Management
+    Route::post('purchase-course', [App\Http\Controllers\Mobile\CourseController::class, 'purchaseCourse']);
+    Route::get('my-courses', [App\Http\Controllers\Mobile\CourseController::class, 'myCourses']);
+    Route::prefix('courses')->group(function () {
+        Route::get('available', [App\Http\Controllers\Mobile\CourseController::class, 'availableCourses']);
+        Route::get('{courseId}', [App\Http\Controllers\Mobile\CourseController::class, 'showCourse']);
+        Route::post('{courseId}/start', [App\Http\Controllers\Mobile\CourseController::class, 'startCourse']);
+        Route::get('{courseId}/lessons', [App\Http\Controllers\Mobile\CourseController::class, 'getLessonsByCourse']);
+        Route::get('{courseId}/progress', [App\Http\Controllers\Mobile\CourseController::class, 'getLessonProgressSummary']);
+        Route::get('{courseId}/lessons/{lessonId}', [App\Http\Controllers\Mobile\CourseController::class, 'showLesson']);
+        Route::post('{courseId}/lessons/{lessonId}/start', [App\Http\Controllers\Mobile\CourseController::class, 'startLesson']);
+        Route::get('{courseId}/lessons/{lessonId}/next', [App\Http\Controllers\Mobile\CourseController::class, 'getNextLesson']);
+        Route::post('lessons/complete', [App\Http\Controllers\Mobile\CourseController::class, 'completeLesson']);
+    });
 });
 
 // Protected Routes (Admin Dashboard)
@@ -164,7 +179,7 @@ Route::prefix('mobile')->group(function () {
     Route::get('articles/{id}', [ArticleController::class, 'show']);
    
     Route::get('courses', [CourseController::class, 'index']);
-    Route::get('courses/{id}', [CourseController::class, 'show']);
+    Route::get('courses/{id}', [App\Http\Controllers\Mobile\CourseController::class, 'showCourse']);
    
     Route::get('videos', [VideoController::class, 'index']);
     Route::get('videos/{id}', [VideoController::class, 'show']);
