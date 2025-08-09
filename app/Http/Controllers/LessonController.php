@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Lesson;
 use App\Models\Course;
+use App\Models\LessonContentBlock;
 use App\Http\Resources\LessonResource;
 use App\Http\Resources\LessonIndexResource;
 use Illuminate\Http\Request;
@@ -18,7 +19,9 @@ class LessonController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Lesson::with(['course']);
+            $query = Lesson::with(['course', 'contentBlocks' => function($query) {
+                $query->with('remedy')->ordered();
+            }]);
 
             // Filter by course_id
             if ($request->has('course_id') && $request->course_id) {
@@ -45,9 +48,9 @@ class LessonController extends Controller
             }
 
             // Sort by field
-            $sortBy = $request->get('sort_by', 'order');
-            $sortOrder = $request->get('sort_order', 'asc');
-            if (in_array($sortBy, ['title', 'status', 'order', 'created_at', 'updated_at'])) {
+            $sortBy = $request->get('sort_by', 'created_at');
+            $sortOrder = $request->get('sort_order', 'desc');
+            if (in_array($sortBy, ['title', 'status', 'created_at', 'updated_at'])) {
                 $query->orderBy($sortBy, $sortOrder);
             }
 
@@ -90,31 +93,17 @@ class LessonController extends Controller
                 'title' => 'required|string|max:255',
                 'description' => 'required|string',
                 'image' => 'nullable|url',
-                'whats_included' => 'nullable|array',
-                'whats_included.*.image' => 'nullable|url',
-                'whats_included.*.title' => 'nullable|string',
-                'activities' => 'nullable|array',
-                'activities.title' => 'nullable|string',
-                'activities.items' => 'nullable|array',
-                'activities.items.*.title' => 'nullable|string',
-                'video' => 'nullable|array',
-                'video.title' => 'nullable|string',
-                'video.description' => 'nullable|string',
-                'video.link' => 'nullable|url',
-                'instructions' => 'nullable|array',
-                'instructions.*.title' => 'nullable|string',
-                'instructions.*.image' => 'nullable|url',
-                'ingredients' => 'nullable|array',
-                'ingredients.*.title' => 'nullable|string',
-                'ingredients.*.image' => 'nullable|url',
-                'tips' => 'nullable|array',
-                'tips.title' => 'nullable|string',
-                'tips.description' => 'nullable|string',
-                'tips.content' => 'nullable|array',
-                'tips.content.*.title' => 'nullable|string',
-                'tips.content.*.image' => 'nullable|url',
                 'status' => 'nullable|in:active,inactive',
-                'order' => 'nullable|integer|min:0',
+                'content_blocks' => 'nullable|array',
+                'content_blocks.*.type' => 'required_with:content_blocks|string|max:100',
+                'content_blocks.*.title' => 'required_with:content_blocks|string|max:255',
+                'content_blocks.*.description' => 'required_with:content_blocks|string',
+                'content_blocks.*.image_url' => 'nullable|url',
+                'content_blocks.*.video_url' => 'nullable|url',
+                'content_blocks.*.remedy_id' => 'nullable|exists:remedies,id',
+                'content_blocks.*.content' => 'nullable|array',
+                'content_blocks.*.order' => 'required_with:content_blocks|integer|min:0',
+                'content_blocks.*.is_active' => 'nullable|boolean',
             ]);
 
             if ($validator->fails()) {
@@ -126,21 +115,58 @@ class LessonController extends Controller
             }
 
             $validatedData = $validator->validated();
-            
-            // Ensure JSON fields are properly initialized
-            $validatedData['whats_included'] = $validatedData['whats_included'] ?? [];
-            $validatedData['activities'] = $validatedData['activities'] ?? [];
-            $validatedData['video'] = $validatedData['video'] ?? [];
-            $validatedData['instructions'] = $validatedData['instructions'] ?? [];
-            $validatedData['ingredients'] = $validatedData['ingredients'] ?? [];
-            $validatedData['tips'] = $validatedData['tips'] ?? [];
-            
+            $contentBlocks = $validatedData['content_blocks'] ?? [];
+            unset($validatedData['content_blocks']);
+
+            // Create lesson
             $lesson = Lesson::create($validatedData);
+
+            // Create content blocks if provided
+            if (!empty($contentBlocks)) {
+                foreach ($contentBlocks as $blockData) {
+                    $blockData['lesson_id'] = $lesson->id;
+                    
+                    // Handle ingredients and instructions arrays
+                    if (in_array($blockData['type'], ['ingredients', 'instructions'])) {
+                        $content = [];
+                        
+                        if ($blockData['type'] === 'ingredients' && isset($blockData['content']['items'])) {
+                            $content['items'] = array_map(function($item) {
+                                return array_intersect_key($item, array_flip(['title', 'image_url']));
+                            }, $blockData['content']['items']);
+                        }
+                        
+                        if ($blockData['type'] === 'instructions' && isset($blockData['content']['steps'])) {
+                            $content['steps'] = array_map(function($step) {
+                                return array_intersect_key($step, array_flip(['title', 'image_url']));
+                            }, $blockData['content']['steps']);
+                        }
+                        
+                        // Only set content if we have data
+                        if (!empty($content)) {
+                            $blockData['content'] = $content;
+                        }
+                    }
+
+                    // Handle remedy type - store remedy_id and basic info
+                    if ($blockData['type'] === 'remedy' && isset($blockData['remedy_id'])) {
+                        // Keep remedy_id for relationship
+                        // Content will be populated from the remedy relationship
+                    }
+                    
+                    LessonContentBlock::create($blockData);
+                }
+            }
+
+            // Load the lesson with content blocks and remedy relationships
+            $lesson->load(['contentBlocks' => function($query) {
+                $query->with('remedy')->ordered();
+            }]);
 
             return response()->json([
                 'success' => true,
                 'data' => new LessonResource($lesson),
-                'message' => 'Lesson created successfully'
+                'message' => 'Lesson created successfully with content blocks'
             ], 201);
         } catch (\Exception $e) {
             return response()->json([
@@ -157,7 +183,9 @@ class LessonController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $lesson = Lesson::with(['course'])->find($id);
+            $lesson = Lesson::with(['course', 'contentBlocks' => function($query) {
+                $query->with('remedy')->ordered();
+            }])->find($id);
 
             if (!$lesson) {
                 return response()->json([
@@ -200,31 +228,18 @@ class LessonController extends Controller
                 'title' => 'sometimes|required|string|max:255',
                 'description' => 'sometimes|required|string',
                 'image' => 'nullable|url',
-                'whats_included' => 'nullable|array',
-                'whats_included.*.image' => 'nullable|url',
-                'whats_included.*.title' => 'nullable|string',
-                'activities' => 'nullable|array',
-                'activities.title' => 'nullable|string',
-                'activities.items' => 'nullable|array',
-                'activities.items.*.title' => 'nullable|string',
-                'video' => 'nullable|array',
-                'video.title' => 'nullable|string',
-                'video.description' => 'nullable|string',
-                'video.link' => 'nullable|url',
-                'instructions' => 'nullable|array',
-                'instructions.*.title' => 'nullable|string',
-                'instructions.*.image' => 'nullable|url',
-                'ingredients' => 'nullable|array',
-                'ingredients.*.title' => 'nullable|string',
-                'ingredients.*.image' => 'nullable|url',
-                'tips' => 'nullable|array',
-                'tips.title' => 'nullable|string',
-                'tips.description' => 'nullable|string',
-                'tips.content' => 'nullable|array',
-                'tips.content.*.title' => 'nullable|string',
-                'tips.content.*.image' => 'nullable|url',
                 'status' => 'nullable|in:active,inactive',
-                'order' => 'nullable|integer|min:0',
+                'content_blocks' => 'nullable|array',
+                'content_blocks.*.id' => 'nullable|exists:lesson_content_blocks,id',
+                'content_blocks.*.type' => 'required_with:content_blocks|string|max:100',
+                'content_blocks.*.title' => 'required_with:content_blocks|string|max:255',
+                'content_blocks.*.description' => 'required_with:content_blocks|string',
+                'content_blocks.*.image_url' => 'nullable|url',
+                'content_blocks.*.video_url' => 'nullable|url',
+                'content_blocks.*.remedy_id' => 'nullable|exists:remedies,id',
+                'content_blocks.*.content' => 'nullable|array',
+                'content_blocks.*.order' => 'required_with:content_blocks|integer|min:0',
+                'content_blocks.*.is_active' => 'nullable|boolean',
             ]);
 
             if ($validator->fails()) {
@@ -236,33 +251,81 @@ class LessonController extends Controller
             }
 
             $validatedData = $validator->validated();
-            
-            // Ensure JSON fields are properly initialized for updates
-            if (isset($validatedData['whats_included'])) {
-                $validatedData['whats_included'] = $validatedData['whats_included'] ?? [];
-            }
-            if (isset($validatedData['activities'])) {
-                $validatedData['activities'] = $validatedData['activities'] ?? [];
-            }
-            if (isset($validatedData['video'])) {
-                $validatedData['video'] = $validatedData['video'] ?? [];
-            }
-            if (isset($validatedData['instructions'])) {
-                $validatedData['instructions'] = $validatedData['instructions'] ?? [];
-            }
-            if (isset($validatedData['ingredients'])) {
-                $validatedData['ingredients'] = $validatedData['ingredients'] ?? [];
-            }
-            if (isset($validatedData['tips'])) {
-                $validatedData['tips'] = $validatedData['tips'] ?? [];
-            }
-            
+            $contentBlocks = $validatedData['content_blocks'] ?? [];
+            unset($validatedData['content_blocks']);
+
+            // Update lesson basic info
             $lesson->update($validatedData);
+
+            // Handle content blocks update
+            if (!empty($contentBlocks)) {
+                foreach ($contentBlocks as $blockData) {
+                    if (isset($blockData['id'])) {
+                        // Update existing block
+                        $existingBlock = $lesson->contentBlocks()->find($blockData['id']);
+                        if ($existingBlock) {
+                            // Handle ingredients and instructions arrays
+                            if (in_array($blockData['type'], ['ingredients', 'instructions'])) {
+                                $content = [];
+                                
+                                if ($blockData['type'] === 'ingredients' && isset($blockData['content']['items'])) {
+                                    $content['items'] = array_map(function($item) {
+                                        return array_intersect_key($item, array_flip(['title', 'image_url']));
+                                    }, $blockData['content']['items']);
+                                }
+                                
+                                if ($blockData['type'] === 'instructions' && isset($blockData['content']['steps'])) {
+                                    $content['steps'] = array_map(function($step) {
+                                        return array_intersect_key($step, array_flip(['title', 'image_url']));
+                                    }, $blockData['content']['steps']);
+                                }
+                                
+                                if (!empty($content)) {
+                                    $blockData['content'] = $content;
+                                }
+                            }
+                            
+                            $existingBlock->update($blockData);
+                        }
+                    } else {
+                        // Create new block
+                        $blockData['lesson_id'] = $lesson->id;
+                        
+                        // Handle ingredients and instructions arrays
+                        if (in_array($blockData['type'], ['ingredients', 'instructions'])) {
+                            $content = [];
+                            
+                            if ($blockData['type'] === 'ingredients' && isset($blockData['content']['items'])) {
+                                $content['items'] = array_map(function($item) {
+                                    return array_intersect_key($item, array_flip(['title', 'image_url']));
+                                }, $blockData['content']['items']);
+                            }
+                            
+                            if ($blockData['type'] === 'instructions' && isset($blockData['content']['steps'])) {
+                                $content['steps'] = array_map(function($step) {
+                                    return array_intersect_key($step, array_flip(['title', 'image_url']));
+                                }, $blockData['content']['steps']);
+                            }
+                            
+                            if (!empty($content)) {
+                                $blockData['content'] = $content;
+                            }
+                        }
+                        
+                        LessonContentBlock::create($blockData);
+                    }
+                }
+            }
+
+            // Load the lesson with updated content blocks and remedy relationships
+            $lesson->load(['contentBlocks' => function($query) {
+                $query->with('remedy');
+            }]);
 
             return response()->json([
                 'success' => true,
                 'data' => new LessonResource($lesson),
-                'message' => 'Lesson updated successfully'
+                'message' => 'Lesson updated successfully with content blocks'
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -352,7 +415,9 @@ class LessonController extends Controller
                 ], 404);
             }
 
-            $lessons = $course->lessons()->active()->get();
+            $lessons = $course->lessons()->active()->with(['contentBlocks' => function($query) {
+                $query->with('remedy')->ordered();
+            }])->get();
 
             return response()->json([
                 'success' => true,

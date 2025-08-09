@@ -136,6 +136,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('lessons', LessonController::class);
     Route::patch('lessons/{id}/toggle-status', [LessonController::class, 'toggleStatus']);
     Route::get('courses/{courseId}/lessons', [LessonController::class, 'byCourse']);
+    
+    // Lesson Content Blocks Routes
+    Route::prefix('lessons/{lessonId}/content-blocks')->group(function () {
+        Route::get('/', [App\Http\Controllers\LessonContentBlockController::class, 'index']);
+        Route::post('/', [App\Http\Controllers\LessonContentBlockController::class, 'store']);
+        Route::get('/types', [App\Http\Controllers\LessonContentBlockController::class, 'getTypes']);
+        Route::patch('/reorder', [App\Http\Controllers\LessonContentBlockController::class, 'reorder']);
+        Route::get('/{blockId}', [App\Http\Controllers\LessonContentBlockController::class, 'show']);
+        Route::put('/{blockId}', [App\Http\Controllers\LessonContentBlockController::class, 'update']);
+        Route::delete('/{blockId}', [App\Http\Controllers\LessonContentBlockController::class, 'destroy']);
+        Route::patch('/{blockId}/toggle-status', [App\Http\Controllers\LessonContentBlockController::class, 'toggleStatus']);
+    });
 }); 
 
 // Public Mobile App Routes (Guest Mode)

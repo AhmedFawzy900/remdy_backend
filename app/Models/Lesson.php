@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Lesson extends Model
 {
@@ -12,34 +13,11 @@ class Lesson extends Model
         'title',
         'description',
         'image',
-        'whats_included',
-        'activities',
-        'video',
-        'instructions',
-        'ingredients',
-        'tips',
         'status',
-        'order',
     ];
 
     protected $casts = [
-        'whats_included' => 'array',
-        'activities' => 'array',
-        'video' => 'array',
-        'instructions' => 'array',
-        'ingredients' => 'array',
-        'tips' => 'array',
         'status' => 'string',
-        'order' => 'integer',
-    ];
-
-    protected $attributes = [
-        'whats_included' => '[]',
-        'activities' => '{}',
-        'video' => '{}',
-        'instructions' => '[]',
-        'ingredients' => '[]',
-        'tips' => '{}',
     ];
 
     const STATUS_ACTIVE = 'active';
@@ -51,6 +29,30 @@ class Lesson extends Model
     public function course(): BelongsTo
     {
         return $this->belongsTo(Course::class);
+    }
+
+    /**
+     * Get the content blocks for the lesson.
+     */
+    public function contentBlocks(): HasMany
+    {
+        return $this->hasMany(LessonContentBlock::class)->ordered();
+    }
+
+    /**
+     * Get the active content blocks for the lesson.
+     */
+    public function activeContentBlocks(): HasMany
+    {
+        return $this->hasMany(LessonContentBlock::class)->active()->ordered();
+    }
+
+    /**
+     * Get content blocks by type
+     */
+    public function contentBlocksByType($type): HasMany
+    {
+        return $this->hasMany(LessonContentBlock::class)->ofType($type)->ordered();
     }
 
     public function scopeActive($query)
@@ -65,6 +67,6 @@ class Lesson extends Model
 
     public function scopeOrdered($query)
     {
-        return $query->orderBy('order', 'asc');
+        return $query->orderBy('created_at', 'asc');
     }
 }

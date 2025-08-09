@@ -41,6 +41,7 @@ class DatabaseSeeder extends Seeder
             PlanSeeder::class,
             AdSeeder::class,
             LessonSeeder::class,
+            LessonContentBlockSeeder::class,
         ]);
     }
 }
