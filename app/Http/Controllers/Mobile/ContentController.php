@@ -39,7 +39,7 @@ class ContentController extends Controller
                 ->where('status', 'active')
                 ->where(function($query) {
                     $query->whereNull('plans')
-                          ->orWhereJsonContains('plans', 'free');
+                          ->orWhere('plans', 'free');
                 })
                 ->orderBy('created_at', 'desc')
                 ->limit($limit)
@@ -107,7 +107,7 @@ class ContentController extends Controller
                         ->where('status', 'active')
                         ->where(function($query) {
                             $query->whereNull('plans')
-                                  ->orWhereJsonContains('plans', 'free');
+                                  ->orWhere('plans', 'free');
                         })
                         ->orderBy('created_at', 'desc')
                         ->limit($limit)
@@ -178,7 +178,7 @@ class ContentController extends Controller
                         ->where('status', 'active')
                         ->where(function($query) {
                             $query->whereNull('plans')
-                                  ->orWhereJsonContains('plans', 'free');
+                                  ->orWhere('plans', 'free');
                         })
                         ->find($id);
                     $resource = ArticleResource::class;
@@ -263,7 +263,7 @@ class ContentController extends Controller
                 ->where('is_featured', true)
                 ->where(function($query) {
                     $query->whereNull('plans')
-                          ->orWhereJsonContains('plans', 'free');
+                          ->orWhere('plans', 'free');
                 })
                 ->orderBy('created_at', 'desc')
                 ->limit($limit)
@@ -352,7 +352,7 @@ class ContentController extends Controller
                     })
                     ->where(function($query) {
                         $query->whereNull('plans')
-                              ->orWhereJsonContains('plans', 'free');
+                              ->orWhere('plans', 'free');
                     })
                     ->orderBy('created_at', 'desc')
                     ->limit($limit)

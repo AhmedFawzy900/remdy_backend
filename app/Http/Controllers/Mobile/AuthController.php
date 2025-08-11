@@ -393,9 +393,15 @@ class AuthController extends Controller
                 ], 401);
             }
 
+            // Prepare user data with default image if image is null
+            $userData = $user->toArray();
+            if (is_null($userData['profile_image'])) {
+                $userData['profile_image'] = url('uploads/images/default.png');
+            }
+
             return response()->json([
                 'success' => true,
-                'data' => $user,
+                'data' => $userData,
                 'message' => 'Profile retrieved successfully'
             ], 200);
         } catch (\Exception $e) {

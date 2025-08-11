@@ -31,7 +31,7 @@ class ArticleController extends Controller
 
             // Filter by plan
             if ($request->has('plan') && $request->plan) {
-                $query->whereJsonContains('plans', $request->plan);
+                $query->where('plans', $request->plan);
             }
 
             // General search
@@ -94,8 +94,7 @@ class ArticleController extends Controller
                 'plants.*.image' => 'nullable|url',
                 'plants.*.title' => 'required|string',
                 'plants.*.description' => 'required|string',
-                'plans' => 'nullable|array',
-                'plans.*' => 'string|in:basic,premium,pro',
+                'plans' => 'nullable|string|in:basic,premium,pro',
                 'status' => 'sometimes|in:active,inactive',
             ]);
 
@@ -182,8 +181,7 @@ class ArticleController extends Controller
                 'plants.*.image' => 'nullable|url',
                 'plants.*.title' => 'required|string',
                 'plants.*.description' => 'required|string',
-                'plans' => 'nullable|array',
-                'plans.*' => 'string|in:basic,premium,pro',
+                'plans' => 'nullable',
                 'status' => 'sometimes|in:active,inactive',
             ]);
 

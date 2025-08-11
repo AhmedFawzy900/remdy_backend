@@ -195,7 +195,7 @@ class RemedyController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => new RemedyResource($remedy),
-                'related_remedies' => RemedyResource::collection($relatedRemedies),
+                'related_remedies' => RemedyIndexResource::collection($relatedRemedies),
                 'message' => 'Remedy retrieved successfully'
             ], 200);
         } catch (\Exception $e) {

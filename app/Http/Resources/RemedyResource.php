@@ -57,7 +57,7 @@ class RemedyResource extends JsonResource
         }
 
         if ($this->relationLoaded('reviews')) {
-            $data['reviews'] = ReviewResource::collection($this->reviews);
+            $data['reviews'] = ReviewResource::collection($this->reviews->take(2));
         }
 
         // Add is_fav field - always present

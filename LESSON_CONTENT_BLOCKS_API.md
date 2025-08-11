@@ -1,165 +1,229 @@
-# 🚀 Lesson Content Blocks API Documentation
+# Lesson Content Blocks API Documentation
 
-## 📋 Overview
+## Overview
 
-This API provides a **simplified and efficient** content management system for lessons. You can now create a complete lesson with all its content blocks in a **single API call**! The system automatically manages lesson ordering while giving you full control over content block positioning.
+The Lesson Content Blocks API allows you to manage different types of content blocks within lessons. Each content block has a specific type and structure based on the content it contains.
 
-## ✨ Key Features
+## Available Content Block Types
 
-- **🎯 Single API Call**: Create lesson + all content blocks in one request
-- **📝 Simplified Content**: Just title, description, and image/video URL
-- **🔄 Dynamic Lesson Order**: Lessons automatically ordered by creation date
-- **📱 Explicit Content Block Order**: You control exactly where each block appears
-- **🎨 Rich Content Types**: Support for video, text, image, remedy, ingredients, tips, and instructions
-- **⚡ Performance**: Optimized queries with proper indexing
-
-## 🗄️ Database Structure
-
-### Lessons Table
-```sql
-lessons
-├── id (primary key)
-├── course_id (foreign key)
-├── title
-├── description
-├── image (nullable)
-├── status (active/inactive)
-├── created_at
-└── updated_at
+### 1. Content (List of image + title)
+- **Type**: `content`
+- **Description**: Displays a list of items, each with an image and title
+- **Structure**:
+```json
+{
+  "type": "content",
+  "title": "Content List Title",
+  "description": "Optional description",
+  "content": {
+    "items": [
+      {
+        "title": "Item 1",
+        "image_url": "https://example.com/image1.jpg"
+      },
+      {
+        "title": "Item 2", 
+        "image_url": "https://example.com/image2.jpg"
+      }
+    ]
+  },
+  "order": 1,
+  "is_active": true
+}
 ```
 
-### Lesson Content Blocks Table
-```sql
-lesson_content_blocks
-├── id (primary key)
-├── lesson_id (foreign key)
-├── type (string: video, text, image, etc.)
-├── title (string)
-├── description (text)
-├── image_url (nullable)
-├── video_url (nullable)
-├── content (JSON - for complex data like arrays)
-├── order (integer - REQUIRED for positioning)
-├── is_active (boolean)
-├── created_at
-└── updated_at
+### 2. Text (Rich HTML text)
+- **Type**: `text`
+- **Description**: Rich text content with HTML support (bold, font size, color, etc.)
+- **Structure**:
+```json
+{
+  "type": "text",
+  "title": "Text Block Title",
+  "description": "Optional description",
+  "content": {
+    "html_content": "<p><strong>Bold text</strong> with <span style=\"color: red;\">colored text</span> and <span style=\"font-size: 18px;\">larger font</span></p>"
+  },
+  "order": 2,
+  "is_active": true
+}
 ```
 
-**Note**: Lesson order is now **dynamic** (based on creation date), but content block order is **explicit** (you specify the exact position).
-
-## 🎯 Content Block Types & Simplified Structure
-
-### 1. Video Block
+### 3. Video (Video link + title)
+- **Type**: `video`
+- **Description**: Video content with title and video URL
+- **Structure**:
 ```json
 {
   "type": "video",
   "title": "Video Title",
   "description": "Video description",
-  "video_url": "https://example.com/video.mp4",
-  "image_url": "https://example.com/thumbnail.jpg",
-  "order": 0
+  "video_url": "https://youtube.com/watch?v=example",
+  "content": {
+    "video_url": "https://youtube.com/watch?v=example",
+    "title": "Video Title",
+    "description": "Video description"
+  },
+  "order": 3,
+  "is_active": true
 }
 ```
 
-### 2. Text Block
+### 4. Remedy (Remedy model)
+- **Type**: `remedy`
+- **Description**: Links to a specific remedy with full remedy details
+- **Structure**:
 ```json
 {
-  "type": "text",
-  "title": "Section Title",
-  "description": "Your text content here",
-  "image_url": "https://example.com/optional-image.jpg",
-  "order": 1
+  "type": "remedy",
+  "title": "Remedy Block Title",
+  "description": "Optional description",
+  "remedy_id": 1,
+  "content": {
+    "remedy_id": 1
+  },
+  "order": 4,
+  "is_active": true
 }
 ```
 
-### 3. Image Block
+### 5. Tip (Image + rich text)
+- **Type**: `tip`
+- **Description**: Tip content with image and rich text
+- **Structure**:
+```json
+{
+  "type": "tip",
+  "title": "Tip Title",
+  "description": "Optional description",
+  "image_url": "https://example.com/tip-image.jpg",
+  "content": {
+    "image_url": "https://example.com/tip-image.jpg",
+    "html_content": "<p>This is a helpful tip with <strong>bold text</strong> and <span style=\"color: blue;\">colored text</span></p>"
+  },
+  "order": 5,
+  "is_active": true
+}
+```
+
+### 6. Image (Image + optional URL)
+- **Type**: `image`
+- **Description**: Single image with optional link URL
+- **Structure**:
 ```json
 {
   "type": "image",
   "title": "Image Title",
-  "description": "Image description",
+  "description": "Optional description",
   "image_url": "https://example.com/image.jpg",
-  "order": 2
-}
-```
-
-### 4. Remedy Block
-```json
-{
-  "type": "remedy",
-  "title": "Remedy Name",
-  "description": "Remedy description",
-  "image_url": "https://example.com/remedy.jpg",
-  "order": 3
-}
-```
-
-### 5. Ingredients Block
-```json
-{
-  "type": "ingredients",
-  "title": "Required Materials",
-  "description": "List of ingredients needed",
-  "image_url": "https://example.com/ingredients-overview.jpg",
-  "order": 4,
   "content": {
-    "items": [
-      {
-        "title": "Ingredient Name",
-        "image_url": "https://example.com/ingredient.jpg"
-      },
-      {
-        "title": "Another Ingredient",
-        "image_url": "https://example.com/another.jpg"
-      }
-    ]
-  }
-}
-```
-
-### 6. Tips Block
-```json
-{
-  "type": "tips",
-  "title": "Pro Tips",
-  "description": "Essential tips for success",
-  "image_url": "https://example.com/tips-overview.jpg",
-  "order": 5,
-  "content": {
-    "items": [
-      {
-        "title": "Tip Title",
-        "image_url": "https://example.com/tip.jpg"
-      }
-    ]
-  }
-}
-```
-
-### 7. Instructions Block
-```json
-{
-  "type": "instructions",
-  "title": "Step-by-Step Instructions",
-  "description": "Follow these steps carefully",
-  "image_url": "https://example.com/instructions-overview.jpg",
+    "image_url": "https://example.com/image.jpg",
+    "link_url": "https://example.com/link",
+    "alt_text": "Image description"
+  },
   "order": 6,
-  "content": {
-    "steps": [
-      {
-        "title": "Step Title",
-        "image_url": "https://example.com/step.jpg"
-      }
-    ]
-  }
+  "is_active": true
 }
 ```
 
-## 🔌 API Endpoints
+### 7. PDF (PDF file + title)
+- **Type**: `pdf`
+- **Description**: PDF document with title and PDF URL
+- **Structure**:
+```json
+{
+  "type": "pdf",
+  "title": "PDF Document Title",
+  "description": "PDF description",
+  "pdf_url": "https://example.com/document.pdf",
+  "content": {
+    "pdf_url": "https://example.com/document.pdf",
+    "title": "PDF Document Title",
+    "description": "PDF description"
+  },
+  "order": 7,
+  "is_active": true
+}
+```
 
-### **🎯 MAIN ENDPOINT: Create Lesson with Content Blocks**
+## API Endpoints
 
-```http
+### Get Content Block Types
+```
+GET /api/lessons/{lessonId}/content-blocks/types
+```
+Returns available content block types and their structure examples.
+
+### List Content Blocks
+```
+GET /api/lessons/{lessonId}/content-blocks
+```
+Returns all content blocks for a lesson.
+
+**Query Parameters:**
+- `type` - Filter by content block type
+- `active` - Filter by active status (true/false)
+
+### Create Content Block
+```
+POST /api/lessons/{lessonId}/content-blocks
+```
+
+**Required Fields:**
+- `type` - One of the available content block types
+- `title` - Block title (max 255 characters)
+- `order` - Display order (integer, min 0)
+
+**Optional Fields:**
+- `description` - Block description
+- `image_url` - Image URL
+- `video_url` - Video URL
+- `pdf_url` - PDF URL
+- `content` - Content structure based on type
+- `is_active` - Active status (boolean, default true)
+- `remedy_id` - Remedy ID (for remedy type)
+
+### Get Single Content Block
+```
+GET /api/lessons/{lessonId}/content-blocks/{blockId}
+```
+
+### Update Content Block
+```
+PUT /api/lessons/{lessonId}/content-blocks/{blockId}
+```
+
+### Delete Content Block
+```
+DELETE /api/lessons/{lessonId}/content-blocks/{blockId}
+```
+
+### Reorder Content Blocks
+```
+POST /api/lessons/{lessonId}/content-blocks/reorder
+```
+
+**Request Body:**
+```json
+{
+  "blocks": [
+    {"id": 1, "order": 0},
+    {"id": 2, "order": 1},
+    {"id": 3, "order": 2}
+  ]
+}
+```
+
+### Toggle Content Block Status
+```
+POST /api/lessons/{lessonId}/content-blocks/{blockId}/toggle-status
+```
+
+## Creating Lessons with Content Blocks
+
+You can create lessons with content blocks in a single request:
+
+```
 POST /api/lessons
 ```
 
@@ -167,266 +231,112 @@ POST /api/lessons
 ```json
 {
   "course_id": 1,
-  "title": "Complete Natural Medicine Lesson",
-  "description": "Learn everything about natural healing",
+  "title": "Lesson Title",
+  "description": "Lesson description",
   "image": "https://example.com/lesson-image.jpg",
   "status": "active",
   "content_blocks": [
     {
-      "type": "video",
-      "title": "Introduction Video",
-      "description": "Watch this video to get started",
-      "video_url": "https://example.com/intro.mp4",
-      "image_url": "https://example.com/thumbnail.jpg",
-      "order": 0
-    },
-    {
       "type": "text",
-      "title": "What You'll Learn",
-      "description": "In this lesson, you will discover the fundamentals of natural medicine...",
-      "order": 1
+      "title": "Introduction",
+      "content": {
+        "html_content": "<p>Welcome to this lesson!</p>"
+      },
+      "order": 0,
+      "is_active": true
     },
     {
-      "type": "image",
-      "title": "Natural Medicine Chart",
-      "description": "This diagram shows the hierarchy of natural healing approaches",
-      "image_url": "https://example.com/chart.jpg",
-      "order": 2
+      "type": "video",
+      "title": "Lesson Video",
+      "video_url": "https://youtube.com/watch?v=example",
+      "content": {
+        "video_url": "https://youtube.com/watch?v=example",
+        "title": "Lesson Video",
+        "description": "Watch this video to learn more"
+      },
+      "order": 1,
+      "is_active": true
     },
     {
-      "type": "ingredients",
-      "title": "Required Materials",
-      "description": "Gather these items to follow along",
-      "image_url": "https://example.com/materials.jpg",
-      "order": 3,
+      "type": "content",
+      "title": "Key Points",
       "content": {
         "items": [
           {
-            "title": "Lavender Oil",
-            "image_url": "https://example.com/lavender.jpg"
+            "title": "Point 1",
+            "image_url": "https://example.com/point1.jpg"
           },
           {
-            "title": "Carrier Oil",
-            "image_url": "https://example.com/carrier.jpg"
+            "title": "Point 2",
+            "image_url": "https://example.com/point2.jpg"
           }
         ]
-      }
-    },
-    {
-      "type": "instructions",
-      "title": "How to Create Your Remedy",
-      "description": "Follow these steps carefully",
-      "image_url": "https://example.com/steps.jpg",
-      "order": 4,
-      "content": {
-        "steps": [
-          {
-            "title": "Prepare Workspace",
-            "image_url": "https://example.com/step1.jpg"
-          },
-          {
-            "title": "Mix Ingredients",
-            "image_url": "https://example.com/step2.jpg"
-          }
-        ]
-      }
+      },
+      "order": 2,
+      "is_active": true
     }
   ]
 }
 ```
 
-**Response:**
+## Response Format
+
+All API responses follow this format:
+
 ```json
 {
   "success": true,
   "data": {
-    "id": 1,
-    "course_id": 1,
-    "title": "Complete Natural Medicine Lesson",
-    "description": "Learn everything about natural healing",
-    "image": "https://example.com/lesson-image.jpg",
-    "status": "active",
-    "content_blocks": [
-      {
-        "id": 1,
-        "type": "video",
-        "title": "Introduction Video",
-        "description": "Watch this video to get started",
-        "video_url": "https://example.com/intro.mp4",
-        "image_url": "https://example.com/thumbnail.jpg",
-        "order": 0,
-        "is_active": true
-      }
-      // ... more blocks
-    ]
+    // Response data
   },
-  "message": "Lesson created successfully with content blocks"
+  "message": "Success message"
 }
 ```
 
----
+## Error Responses
 
-### **Other Endpoints (for managing existing lessons):**
-
-### 1. List Content Blocks
-```http
-GET /api/lessons/{lessonId}/content-blocks
-```
-
-### 2. Get Content Block
-```http
-GET /api/lessons/{lessonId}/content-blocks/{blockId}
-```
-
-### 3. Update Content Block
-```http
-PUT /api/lessons/{lessonId}/content-blocks/{blockId}
-```
-
-### 4. Delete Content Block
-```http
-DELETE /api/lessons/{lessonId}/content-blocks/{blockId}
-```
-
-### 5. Reorder Content Blocks
-```http
-PATCH /api/lessons/{lessonId}/content-blocks/reorder
-```
-
-### 6. Toggle Block Status
-```http
-PATCH /api/lessons/{lessonId}/content-blocks/{blockId}/toggle-status
-```
-
-### 7. Get Available Content Types
-```http
-GET /api/lessons/{lessonId}/content-blocks/types
-```
-
-## 🚀 Usage Examples
-
-### **Complete Lesson Creation in One API Call**
-
-```bash
-curl -X POST "https://your-domain.com/api/lessons" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "course_id": 1,
-    "title": "Natural Healing Basics",
-    "description": "Complete guide to natural medicine",
-    "image": "https://example.com/lesson.jpg",
-    "status": "active",
-    "content_blocks": [
-      {
-        "type": "video",
-        "title": "Welcome Video",
-        "description": "Introduction to natural healing",
-        "video_url": "https://example.com/welcome.mp4",
-        "order": 0
-      },
-      {
-        "type": "text",
-        "title": "Overview",
-        "description": "What you will learn in this lesson",
-        "order": 1
-      },
-      {
-        "type": "ingredients",
-        "title": "Materials Needed",
-        "description": "Gather these items",
-        "order": 2,
-        "content": {
-          "items": [
-            {"title": "Lavender Oil", "image_url": "https://example.com/lavender.jpg"},
-            {"title": "Carrier Oil", "image_url": "https://example.com/carrier.jpg"}
-          ]
-        }
-      }
-    ]
-  }'
-```
-
-## 📱 Postman Collection
-
-### **Environment Variables:**
-```
-base_url: https://your-domain.com
-your_token: Bearer YOUR_ACTUAL_TOKEN
-```
-
-### **Single Request - Create Complete Lesson:**
-```
-POST {{base_url}}/api/lessons
-Headers:
-  Authorization: {{your_token}}
-  Content-Type: application/json
-
-Body:
+```json
 {
-  "course_id": 1,
-  "title": "Your Lesson Title",
-  "description": "Your lesson description",
-  "image": "https://example.com/image.jpg",
-  "status": "active",
-  "content_blocks": [
-    {
-      "type": "video",
-      "title": "Video Title",
-      "description": "Video description",
-      "video_url": "https://example.com/video.mp4",
-      "order": 0
-    },
-    {
-      "type": "text",
-      "title": "Text Title",
-      "description": "Text content",
-      "order": 1
-    }
-  ]
+  "success": false,
+  "message": "Error message",
+  "errors": {
+    // Validation errors
+  }
 }
 ```
 
-## 🎯 Key Benefits
+## Validation Rules
 
-### ✅ **Single API Call**
-- Create lesson + all content blocks in one request
-- No need for multiple API calls
-- Atomic operation - all or nothing
+### Content Block Validation
+- `type` must be one of the available types
+- `title` is required and max 255 characters
+- `order` is required and must be >= 0
+- `content` structure must match the type requirements
+- `remedy_id` must exist in remedies table (for remedy type)
 
-### ✅ **Simplified Content Structure**
-- Just title, description, and image/video URL
-- Clean and easy to understand
-- Minimal data entry required
+### Content Type-Specific Validation
+- **content**: Must have `items` array with `title` and `image_url` for each item
+- **text**: Must have `html_content` field
+- **video**: Must have `video_url` field
+- **remedy**: Must have `remedy_id` field
+- **tip**: Must have both `image_url` and `html_content` fields
+- **image**: Must have `image_url` field
+- **pdf**: Must have `pdf_url` field
 
-### ✅ **Smart Array Handling**
-- Ingredients and instructions arrays automatically simplified
-- Only title and image_url kept in arrays
-- Complex data stored in content JSON field
+## Database Schema
 
-### ✅ **Automatic Ordering**
-- Content blocks created in the exact order you specify
-- No conflicts or manual reordering needed
-- Perfect for building lesson flow
-
-## 🔧 Migration Steps
-
-1. **Run the new migration** to add simplified fields:
-   ```bash
-   php artisan migrate
-   ```
-
-2. **Update your frontend** to use the new single API structure
-
-3. **Test with a simple lesson** creation
-
-## 🎉 Summary
-
-The new system provides:
-- **Single API call** for complete lesson creation
-- **Simplified content structure** (title, description, image/video URL)
-- **Automatic content block creation** with proper ordering
-- **Clean array handling** for ingredients and instructions
-- **Maximum efficiency** with minimal API calls
-
-This is the **goddest way** to create lessons with dynamic content! 🚀 
+The `lesson_content_blocks` table includes:
+- `id` - Primary key
+- `lesson_id` - Foreign key to lessons table
+- `type` - Content block type
+- `title` - Block title
+- `description` - Block description
+- `image_url` - Image URL
+- `video_url` - Video URL
+- `pdf_url` - PDF URL
+- `content` - JSON content structure
+- `order` - Display order
+- `is_active` - Active status
+- `remedy_id` - Foreign key to remedies table
+- `created_at` - Creation timestamp
+- `updated_at` - Update timestamp 

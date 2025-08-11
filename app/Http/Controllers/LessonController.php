@@ -95,15 +95,16 @@ class LessonController extends Controller
                 'image' => 'nullable|url',
                 'status' => 'nullable|in:active,inactive',
                 'content_blocks' => 'nullable|array',
-                'content_blocks.*.type' => 'required_with:content_blocks|string|max:100',
+                'content_blocks.*.type' => 'required_with:content_blocks|string|in:' . implode(',', LessonContentBlock::getAvailableTypes()),
                 'content_blocks.*.title' => 'required_with:content_blocks|string|max:255',
-                'content_blocks.*.description' => 'required_with:content_blocks|string',
+                'content_blocks.*.description' => 'nullable|string',
                 'content_blocks.*.image_url' => 'nullable|url',
                 'content_blocks.*.video_url' => 'nullable|url',
-                'content_blocks.*.remedy_id' => 'nullable|exists:remedies,id',
+                'content_blocks.*.pdf_url' => 'nullable|url',
                 'content_blocks.*.content' => 'nullable|array',
                 'content_blocks.*.order' => 'required_with:content_blocks|integer|min:0',
                 'content_blocks.*.is_active' => 'nullable|boolean',
+                'content_blocks.*.remedy_id' => 'nullable|exists:remedies,id',
             ]);
 
             if ($validator->fails()) {
@@ -126,32 +127,14 @@ class LessonController extends Controller
                 foreach ($contentBlocks as $blockData) {
                     $blockData['lesson_id'] = $lesson->id;
                     
-                    // Handle ingredients and instructions arrays
-                    if (in_array($blockData['type'], ['ingredients', 'instructions'])) {
-                        $content = [];
-                        
-                        if ($blockData['type'] === 'ingredients' && isset($blockData['content']['items'])) {
-                            $content['items'] = array_map(function($item) {
-                                return array_intersect_key($item, array_flip(['title', 'image_url']));
-                            }, $blockData['content']['items']);
-                        }
-                        
-                        if ($blockData['type'] === 'instructions' && isset($blockData['content']['steps'])) {
-                            $content['steps'] = array_map(function($step) {
-                                return array_intersect_key($step, array_flip(['title', 'image_url']));
-                            }, $blockData['content']['steps']);
-                        }
-                        
-                        // Only set content if we have data
-                        if (!empty($content)) {
-                            $blockData['content'] = $content;
-                        }
-                    }
-
-                    // Handle remedy type - store remedy_id and basic info
-                    if ($blockData['type'] === 'remedy' && isset($blockData['remedy_id'])) {
-                        // Keep remedy_id for relationship
-                        // Content will be populated from the remedy relationship
+                    // Validate content structure based on type
+                    $contentValidation = $this->validateContentBlockByType($blockData['type'], $blockData['content'] ?? []);
+                    if (!$contentValidation['valid']) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Content block validation failed',
+                            'errors' => $contentValidation['errors']
+                        ], 422);
                     }
                     
                     LessonContentBlock::create($blockData);
@@ -231,15 +214,16 @@ class LessonController extends Controller
                 'status' => 'nullable|in:active,inactive',
                 'content_blocks' => 'nullable|array',
                 'content_blocks.*.id' => 'nullable|exists:lesson_content_blocks,id',
-                'content_blocks.*.type' => 'required_with:content_blocks|string|max:100',
+                'content_blocks.*.type' => 'required_with:content_blocks|string|in:' . implode(',', LessonContentBlock::getAvailableTypes()),
                 'content_blocks.*.title' => 'required_with:content_blocks|string|max:255',
-                'content_blocks.*.description' => 'required_with:content_blocks|string',
+                'content_blocks.*.description' => 'nullable|string',
                 'content_blocks.*.image_url' => 'nullable|url',
                 'content_blocks.*.video_url' => 'nullable|url',
-                'content_blocks.*.remedy_id' => 'nullable|exists:remedies,id',
+                'content_blocks.*.pdf_url' => 'nullable|url',
                 'content_blocks.*.content' => 'nullable|array',
                 'content_blocks.*.order' => 'required_with:content_blocks|integer|min:0',
                 'content_blocks.*.is_active' => 'nullable|boolean',
+                'content_blocks.*.remedy_id' => 'nullable|exists:remedies,id',
             ]);
 
             if ($validator->fails()) {
@@ -264,24 +248,15 @@ class LessonController extends Controller
                         // Update existing block
                         $existingBlock = $lesson->contentBlocks()->find($blockData['id']);
                         if ($existingBlock) {
-                            // Handle ingredients and instructions arrays
-                            if (in_array($blockData['type'], ['ingredients', 'instructions'])) {
-                                $content = [];
-                                
-                                if ($blockData['type'] === 'ingredients' && isset($blockData['content']['items'])) {
-                                    $content['items'] = array_map(function($item) {
-                                        return array_intersect_key($item, array_flip(['title', 'image_url']));
-                                    }, $blockData['content']['items']);
-                                }
-                                
-                                if ($blockData['type'] === 'instructions' && isset($blockData['content']['steps'])) {
-                                    $content['steps'] = array_map(function($step) {
-                                        return array_intersect_key($step, array_flip(['title', 'image_url']));
-                                    }, $blockData['content']['steps']);
-                                }
-                                
-                                if (!empty($content)) {
-                                    $blockData['content'] = $content;
+                            // Validate content structure based on type
+                            if (isset($blockData['content'])) {
+                                $contentValidation = $this->validateContentBlockByType($blockData['type'], $blockData['content']);
+                                if (!$contentValidation['valid']) {
+                                    return response()->json([
+                                        'success' => false,
+                                        'message' => 'Content block validation failed',
+                                        'errors' => $contentValidation['errors']
+                                    ], 422);
                                 }
                             }
                             
@@ -291,25 +266,14 @@ class LessonController extends Controller
                         // Create new block
                         $blockData['lesson_id'] = $lesson->id;
                         
-                        // Handle ingredients and instructions arrays
-                        if (in_array($blockData['type'], ['ingredients', 'instructions'])) {
-                            $content = [];
-                            
-                            if ($blockData['type'] === 'ingredients' && isset($blockData['content']['items'])) {
-                                $content['items'] = array_map(function($item) {
-                                    return array_intersect_key($item, array_flip(['title', 'image_url']));
-                                }, $blockData['content']['items']);
-                            }
-                            
-                            if ($blockData['type'] === 'instructions' && isset($blockData['content']['steps'])) {
-                                $content['steps'] = array_map(function($step) {
-                                    return array_intersect_key($step, array_flip(['title', 'image_url']));
-                                }, $blockData['content']['steps']);
-                            }
-                            
-                            if (!empty($content)) {
-                                $blockData['content'] = $content;
-                            }
+                        // Validate content structure based on type
+                        $contentValidation = $this->validateContentBlockByType($blockData['type'], $blockData['content'] ?? []);
+                        if (!$contentValidation['valid']) {
+                            return response()->json([
+                                'success' => false,
+                                'message' => 'Content block validation failed',
+                                'errors' => $contentValidation['errors']
+                            ], 422);
                         }
                         
                         LessonContentBlock::create($blockData);
@@ -431,5 +395,79 @@ class LessonController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Validates the content structure for a specific content block type.
+     *
+     * @param string $type The type of content block.
+     * @param array $content The content data for the block.
+     * @return array An array containing 'valid' and 'errors' keys.
+     */
+    private function validateContentBlockByType(string $type, array $content): array
+    {
+        $errors = [];
+        $valid = true;
+
+        switch ($type) {
+            case 'content':
+                if (!isset($content['items']) || !is_array($content['items'])) {
+                    $errors['items'] = 'Content type requires "items" array';
+                    $valid = false;
+                } else {
+                    foreach ($content['items'] as $index => $item) {
+                        if (!isset($item['title']) || !isset($item['image_url'])) {
+                            $errors['items'][] = "Item at index {$index} must have 'title' and 'image_url'";
+                            $valid = false;
+                        }
+                    }
+                }
+                break;
+            case 'text':
+                if (!isset($content['html_content'])) {
+                    $errors['html_content'] = 'Text type requires "html_content" field';
+                    $valid = false;
+                }
+                break;
+            case 'video':
+                if (!isset($content['video_url'])) {
+                    $errors['video_url'] = 'Video type requires "video_url" field';
+                    $valid = false;
+                }
+                break;
+            case 'remedy':
+                if (!isset($content['remedy_id'])) {
+                    $errors['remedy_id'] = 'Remedy type requires "remedy_id" field';
+                    $valid = false;
+                }
+                break;
+            case 'tip':
+                if (!isset($content['image_url']) || !isset($content['html_content'])) {
+                    $errors['tip'] = 'Tip type requires both "image_url" and "html_content" fields';
+                    $valid = false;
+                }
+                break;
+            case 'image':
+                if (!isset($content['image_url'])) {
+                    $errors['image_url'] = 'Image type requires "image_url" field';
+                    $valid = false;
+                }
+                break;
+            case 'pdf':
+                if (!isset($content['pdf_url'])) {
+                    $errors['pdf_url'] = 'PDF type requires "pdf_url" field';
+                    $valid = false;
+                }
+                break;
+            default:
+                // No specific validation for other types, just ensure content is an array
+                if (!is_array($content)) {
+                    $errors[$type] = 'Content must be an array.';
+                    $valid = false;
+                }
+                break;
+        }
+
+        return ['valid' => $valid, 'errors' => $errors];
     }
 }

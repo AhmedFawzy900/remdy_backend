@@ -30,7 +30,7 @@ class ArticleIndexResource extends JsonResource
             'title' => $this->title,
             'image' => $this->image,
             'description' => $this->description,
-            'plans' => $this->plans,
+            'plan' => $this->plans,
             'status' => $this->status,
             'average_rating' => $averageRating,
             'review_count' => $reviewCount,

@@ -17,6 +17,7 @@ class LessonContentBlock extends Model
         'description',
         'image_url',
         'video_url',
+        'pdf_url',
         'content',
         'order',
         'is_active',
@@ -35,16 +36,14 @@ class LessonContentBlock extends Model
         'is_active' => true,
     ];
 
-    // Common content types for reference (but not enforced)
-    const TYPE_VIDEO = 'video';
-    const TYPE_IMAGE = 'image';
-    const TYPE_TEXT = 'text';
-    const TYPE_REMEDY = 'remedy';
-    const TYPE_INGREDIENTS = 'ingredients';
-    const TYPE_TIPS = 'tips';
-    const TYPE_ACTIVITIES = 'activities';
-    const TYPE_WHATS_INCLUDED = 'whats_included';
-    const TYPE_INSTRUCTIONS = 'instructions';
+    // Content types as specified by the user
+    const TYPE_CONTENT = 'content';      // List of (image + title)
+    const TYPE_TEXT = 'text';           // HTML text (rich text editor)
+    const TYPE_VIDEO = 'video';         // Video link + title
+    const TYPE_REMEDY = 'remedy';       // Remedy model
+    const TYPE_TIP = 'tip';             // Image + text (rich text)
+    const TYPE_IMAGE = 'image';         // Image + URL (optional)
+    const TYPE_PDF = 'pdf';             // PDF file link + title
 
     /**
      * Get the lesson that owns the content block.
@@ -103,5 +102,21 @@ class LessonContentBlock extends Model
         data_set($content, $key, $value);
         $this->content = $content;
         return $this;
+    }
+
+    /**
+     * Get all available content block types
+     */
+    public static function getAvailableTypes(): array
+    {
+        return [
+            self::TYPE_CONTENT,
+            self::TYPE_TEXT,
+            self::TYPE_VIDEO,
+            self::TYPE_REMEDY,
+            self::TYPE_TIP,
+            self::TYPE_IMAGE,
+            self::TYPE_PDF,
+        ];
     }
 } 

@@ -17,7 +17,6 @@ class Article extends Model
 
     protected $casts = [
         'plants' => 'array',
-        'plans' => 'array',
         'status' => 'string',
     ];
 

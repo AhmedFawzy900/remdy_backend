@@ -22,6 +22,7 @@ class LessonContentBlockResource extends JsonResource
             'description' => $this->description,
             'image_url' => $this->image_url,
             'video_url' => $this->video_url,
+            'pdf_url' => $this->pdf_url,
             'content' => $this->content,
             'order' => $this->order,
             'is_active' => $this->is_active,

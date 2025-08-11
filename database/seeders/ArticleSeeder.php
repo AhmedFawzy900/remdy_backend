@@ -35,7 +35,7 @@ class ArticleSeeder extends Seeder
                         'description' => 'Excellent for digestive issues and providing natural energy.'
                     ]
                 ],
-                'plans' => ['basic', 'premium', 'pro'],
+                'plans' => 'basic',
                 'status' => Article::STATUS_ACTIVE,
             ],
             [
@@ -59,7 +59,7 @@ class ArticleSeeder extends Seeder
                         'description' => 'Anti-inflammatory powerhouse with numerous health benefits.'
                     ]
                 ],
-                'plans' => ['premium', 'pro'],
+                'plans' => 'premium',
                 'status' => Article::STATUS_ACTIVE,
             ],
             [
@@ -83,7 +83,7 @@ class ArticleSeeder extends Seeder
                         'description' => 'Energy-boosting mushroom that enhances physical performance.'
                     ]
                 ],
-                'plans' => ['pro'],
+                'plans' => 'pro',
                 'status' => Article::STATUS_ACTIVE,
             ],
             [
@@ -107,7 +107,7 @@ class ArticleSeeder extends Seeder
                         'description' => 'Memory-enhancing oil that improves focus and concentration.'
                     ]
                 ],
-                'plans' => ['basic', 'premium'],
+                'plans' => 'basic',
                 'status' => Article::STATUS_INACTIVE,
             ]
         ];

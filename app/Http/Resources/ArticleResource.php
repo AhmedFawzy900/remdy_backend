@@ -31,7 +31,7 @@ class ArticleResource extends JsonResource
             'image' => $this->image,
             'description' => $this->description,
             'plants' => $this->plants,
-            'plans' => $this->plans,
+            'plan' => $this->plans,
             'status' => $this->status,
             'reviews' => $reviews instanceof \Illuminate\Http\Resources\MissingValue ? [] : ReviewResource::collection($reviews->take(2)),
             'average_rating' => $averageRating,
