@@ -17,26 +17,54 @@ class RemedyController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Remedy::with(['remedyType', 'bodySystem', 'diseaseRelation', 'reviews.user']);
+            $query = Remedy::with(['remedyType', 'bodySystem', 'diseaseRelation', 'reviews.user', 'remedyTypes', 'bodySystems', 'diseases']);
 
             // Filter by title/name
             if ($request->has('title') && $request->title) {
                 $query->where('title', 'like', '%' . $request->title . '%');
             }
 
-            // Filter by disease ID
+            // Filter by disease ID (singular BC)
             if ($request->has('disease_id') && $request->disease_id) {
                 $query->where('disease_id', $request->disease_id);
+            }
+            // New: filter by multiple disease IDs
+            if ($request->filled('disease_ids')) {
+                $ids = is_array($request->disease_ids) ? $request->disease_ids : [$request->disease_ids];
+                $query->where(function ($q) use ($ids) {
+                    $q->whereIn('disease_id', $ids)
+                        ->orWhereHas('diseases', function ($qq) use ($ids) {
+                            $qq->whereIn('diseases.id', $ids);
+                        });
+                });
             }
 
             // Filter by body system
             if ($request->has('body_system_id') && $request->body_system_id) {
                 $query->where('body_system_id', $request->body_system_id);
             }
+            if ($request->filled('body_system_ids')) {
+                $ids = is_array($request->body_system_ids) ? $request->body_system_ids : [$request->body_system_ids];
+                $query->where(function ($q) use ($ids) {
+                    $q->whereIn('body_system_id', $ids)
+                        ->orWhereHas('bodySystems', function ($qq) use ($ids) {
+                            $qq->whereIn('body_systems.id', $ids);
+                        });
+                });
+            }
 
             // Filter by remedy type
             if ($request->has('remedy_type_id') && $request->remedy_type_id) {
                 $query->where('remedy_type_id', $request->remedy_type_id);
+            }
+            if ($request->filled('remedy_type_ids')) {
+                $ids = is_array($request->remedy_type_ids) ? $request->remedy_type_ids : [$request->remedy_type_ids];
+                $query->where(function ($q) use ($ids) {
+                    $q->whereIn('remedy_type_id', $ids)
+                        ->orWhereHas('remedyTypes', function ($qq) use ($ids) {
+                            $qq->whereIn('remedy_types.id', $ids);
+                        });
+                });
             }
 
             // Filter by status
@@ -102,7 +130,18 @@ class RemedyController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
-            $validator = Validator::make($request->all(), [
+            // Normalize singular *_id fields if arrays are sent
+            $data = $request->all();
+            foreach (['remedy_type', 'body_system', 'disease'] as $prefix) {
+                $idKey = $prefix . '_id';
+                $idsKey = $prefix . '_ids';
+                if (isset($data[$idKey]) && is_array($data[$idKey])) {
+                    $data[$idsKey] = $data[$idKey];
+                    $data[$idKey] = $data[$idKey][0] ?? null;
+                }
+            }
+
+            $validator = Validator::make($data, [
                 'title' => 'required|string|max:255',
                 'main_image_url' => 'nullable|url',
                 'disease' => 'required|string|max:255',
@@ -125,6 +164,13 @@ class RemedyController extends Controller
                 'precautions.*.image_url' => 'nullable|url',
                 'precautions.*.name' => 'required|string',
                 'product_link' => 'nullable|url',
+                // New optional arrays (BC):
+                'remedy_type_ids' => 'nullable|array',
+                'remedy_type_ids.*' => 'integer|exists:remedy_types,id',
+                'body_system_ids' => 'nullable|array',
+                'body_system_ids.*' => 'integer|exists:body_systems,id',
+                'disease_ids' => 'nullable|array',
+                'disease_ids.*' => 'integer|exists:diseases,id',
             ]);
 
             if ($validator->fails()) {
@@ -136,23 +182,56 @@ class RemedyController extends Controller
             }
 
             $remedy = Remedy::create([
-                'title' => $request->title,
-                'main_image_url' => $request->main_image_url,
-                'disease' => $request->disease,
-                'disease_id' => $request->disease_id,
-                'remedy_type_id' => $request->remedy_type_id,
-                'body_system_id' => $request->body_system_id,
-                'description' => $request->description,
-                'visible_to_plan' => $request->visible_to_plan,
-                'status' => $request->status ?? Remedy::STATUS_ACTIVE,
-                'ingredients' => $request->ingredients,
-                'instructions' => $request->instructions,
-                'benefits' => $request->benefits,
-                'precautions' => $request->precautions,
-                'product_link' => $request->product_link,
+                'title' => $data['title'] ?? null,
+                'main_image_url' => $data['main_image_url'] ?? null,
+                'disease' => $data['disease'] ?? null,
+                'disease_id' => $data['disease_id'] ?? null,
+                'remedy_type_id' => $data['remedy_type_id'] ?? null,
+                'body_system_id' => $data['body_system_id'] ?? null,
+                'description' => $data['description'] ?? null,
+                'visible_to_plan' => $data['visible_to_plan'] ?? null,
+                'status' => $data['status'] ?? Remedy::STATUS_ACTIVE,
+                'ingredients' => $data['ingredients'] ?? null,
+                'instructions' => $data['instructions'] ?? null,
+                'benefits' => $data['benefits'] ?? null,
+                'precautions' => $data['precautions'] ?? null,
+                'product_link' => $data['product_link'] ?? null,
             ]);
 
-            $remedy->load(['remedyType', 'bodySystem', 'diseaseRelation']);
+            // Sync many-to-many arrays if provided (and keep single columns as fallback)
+            $dirty = false;
+            if (!empty($data['remedy_type_ids'])) {
+                $ids = is_array($data['remedy_type_ids']) ? $data['remedy_type_ids'] : [$data['remedy_type_ids']];
+                $remedy->remedyTypes()->sync($ids);
+                $first = $ids[0] ?? null;
+                if ($first && $remedy->remedy_type_id !== $first) {
+                    $remedy->remedy_type_id = $first;
+                    $dirty = true;
+                }
+            }
+            if (!empty($data['body_system_ids'])) {
+                $ids = is_array($data['body_system_ids']) ? $data['body_system_ids'] : [$data['body_system_ids']];
+                $remedy->bodySystems()->sync($ids);
+                $first = $ids[0] ?? null;
+                if ($first && $remedy->body_system_id !== $first) {
+                    $remedy->body_system_id = $first;
+                    $dirty = true;
+                }
+            }
+            if (!empty($data['disease_ids'])) {
+                $ids = is_array($data['disease_ids']) ? $data['disease_ids'] : [$data['disease_ids']];
+                $remedy->diseases()->sync($ids);
+                $first = $ids[0] ?? null;
+                if ($first && $remedy->disease_id !== $first) {
+                    $remedy->disease_id = $first;
+                    $dirty = true;
+                }
+            }
+            if ($dirty) {
+                $remedy->save();
+            }
+
+            $remedy->load(['remedyType', 'bodySystem', 'diseaseRelation', 'remedyTypes', 'bodySystems', 'diseases']);
 
             return response()->json([
                 'success' => true,
@@ -179,7 +258,10 @@ class RemedyController extends Controller
                 'bodySystem', 
                 'diseaseRelation', 
                 'reviews.user', 
-                'reviews.reactions'
+                'reviews.reactions',
+                'remedyTypes',
+                'bodySystems',
+                'diseases'
             ])->find($id);
             
             if (!$remedy) {
@@ -192,10 +274,14 @@ class RemedyController extends Controller
             // Get related remedies from the same category with similar names
             $relatedRemedies = $this->getRelatedRemedies($remedy);
 
+            // Targeted ads for this remedy
+            $ads = \App\Models\Ad::active()->forPlacement(\App\Models\Ad::TYPE_REMEDY, (int)$remedy->id)->orderBy('created_at', 'desc')->get();
+
             return response()->json([
                 'success' => true,
                 'data' => new RemedyResource($remedy),
                 'related_remedies' => RemedyIndexResource::collection($relatedRemedies),
+                'ads' => \App\Http\Resources\AdResource::collection($ads),
                 'message' => 'Remedy retrieved successfully'
             ], 200);
         } catch (\Exception $e) {
@@ -219,7 +305,10 @@ class RemedyController extends Controller
                 'diseaseRelation', 
                 'reviews.user', 
                 'reviews.reactions',
-                'diseaseRelation'
+                'diseaseRelation',
+                'remedyTypes',
+                'bodySystems',
+                'diseases'
             ])->find($id);
             
             if (!$remedy) {
@@ -251,11 +340,27 @@ class RemedyController extends Controller
      */
     private function getRelatedRemedies(Remedy $remedy): \Illuminate\Database\Eloquent\Collection
     {
-        // Get remedies from the same category (remedy_type_id)
+        // Gather remedy type IDs from both single column and many-to-many
+        $typeIds = [];
+        if (!empty($remedy->remedy_type_id)) {
+            $typeIds[] = $remedy->remedy_type_id;
+        }
+        try {
+            $manyIds = $remedy->remedyTypes()->pluck('remedy_types.id')->toArray();
+            $typeIds = array_values(array_unique(array_merge($typeIds, $manyIds)));
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
         $relatedRemedies = Remedy::where('id', '!=', $remedy->id)
-            ->where('remedy_type_id', $remedy->remedy_type_id)
             ->where('status', 'active')
-            ->with(['remedyType', 'bodySystem', 'diseaseRelation', 'reviews.user', 'reviews.reactions'])
+            ->when(!empty($typeIds), function ($q) use ($typeIds) {
+                $q->whereIn('remedy_type_id', $typeIds)
+                  ->orWhereHas('remedyTypes', function ($qq) use ($typeIds) {
+                      $qq->whereIn('remedy_types.id', $typeIds);
+                  });
+            })
+            ->with(['remedyType', 'bodySystem', 'diseaseRelation', 'reviews.user', 'reviews.reactions', 'remedyTypes', 'bodySystems', 'diseases'])
             ->orderBy('created_at', 'desc')
             ->limit(6)
             ->get();
@@ -274,7 +379,7 @@ class RemedyController extends Controller
                           ->orWhere('title', 'LIKE', '%' . $remedy->disease . '%')
                           ->orWhere('disease', 'LIKE', '%' . $remedy->title . '%');
                 })
-                ->with(['remedyType', 'bodySystem', 'diseaseRelation', 'reviews.user', 'reviews.reactions'])
+                ->with(['remedyType', 'bodySystem', 'diseaseRelation', 'reviews.user', 'reviews.reactions', 'remedyTypes', 'bodySystems', 'diseases'])
                 ->orderBy('created_at', 'desc')
                 ->limit($remainingCount)
                 ->get();
@@ -300,7 +405,18 @@ class RemedyController extends Controller
                 ], 404);
             }
 
-            $validator = Validator::make($request->all(), [
+            // Normalize singular *_id fields if arrays are sent
+            $data = $request->all();
+            foreach (['remedy_type', 'body_system', 'disease'] as $prefix) {
+                $idKey = $prefix . '_id';
+                $idsKey = $prefix . '_ids';
+                if (isset($data[$idKey]) && is_array($data[$idKey])) {
+                    $data[$idsKey] = $data[$idKey];
+                    $data[$idKey] = $data[$idKey][0] ?? null;
+                }
+            }
+
+            $validator = Validator::make($data, [
                 'title' => 'sometimes|required|string|max:255',
                 'main_image_url' => 'nullable|url',
                 'disease' => 'sometimes|required|string|max:255',
@@ -323,6 +439,13 @@ class RemedyController extends Controller
                 'precautions.*.image_url' => 'nullable|url',
                 'precautions.*.name' => 'required|string',
                 'product_link' => 'nullable|url',
+                // New optional arrays (BC):
+                'remedy_type_ids' => 'nullable|array',
+                'remedy_type_ids.*' => 'integer|exists:remedy_types,id',
+                'body_system_ids' => 'nullable|array',
+                'body_system_ids.*' => 'integer|exists:body_systems,id',
+                'disease_ids' => 'nullable|array',
+                'disease_ids.*' => 'integer|exists:diseases,id',
             ]);
 
             if ($validator->fails()) {
@@ -333,8 +456,42 @@ class RemedyController extends Controller
                 ], 422);
             }
 
-            $remedy->update($request->all());
-            $remedy->load(['remedyType', 'bodySystem', 'diseaseRelation']);
+            $remedy->update($data);
+
+            // Sync many-to-many arrays if provided and keep single columns up-to-date
+            $dirty = false;
+            if (!empty($data['remedy_type_ids'])) {
+                $ids = is_array($data['remedy_type_ids']) ? $data['remedy_type_ids'] : [$data['remedy_type_ids']];
+                $remedy->remedyTypes()->sync($ids);
+                $first = $ids[0] ?? null;
+                if ($first && $remedy->remedy_type_id !== $first) {
+                    $remedy->remedy_type_id = $first;
+                    $dirty = true;
+                }
+            }
+            if (!empty($data['body_system_ids'])) {
+                $ids = is_array($data['body_system_ids']) ? $data['body_system_ids'] : [$data['body_system_ids']];
+                $remedy->bodySystems()->sync($ids);
+                $first = $ids[0] ?? null;
+                if ($first && $remedy->body_system_id !== $first) {
+                    $remedy->body_system_id = $first;
+                    $dirty = true;
+                }
+            }
+            if (!empty($data['disease_ids'])) {
+                $ids = is_array($data['disease_ids']) ? $data['disease_ids'] : [$data['disease_ids']];
+                $remedy->diseases()->sync($ids);
+                $first = $ids[0] ?? null;
+                if ($first && $remedy->disease_id !== $first) {
+                    $remedy->disease_id = $first;
+                    $dirty = true;
+                }
+            }
+            if ($dirty) {
+                $remedy->save();
+            }
+
+            $remedy->load(['remedyType', 'bodySystem', 'diseaseRelation', 'remedyTypes', 'bodySystems', 'diseases']);
 
             return response()->json([
                 'success' => true,
@@ -422,7 +579,7 @@ class RemedyController extends Controller
     public function featured(): JsonResponse
     {
         try {
-            $remedies = Remedy::with(['remedyType', 'bodySystem'])
+            $remedies = Remedy::with(['remedyType', 'bodySystem', 'remedyTypes', 'bodySystems'])
                 ->where('status', 'active')
                 ->where('is_featured', true)
                 ->orderBy('created_at', 'desc')
@@ -449,9 +606,14 @@ class RemedyController extends Controller
     public function byBodySystem(string $bodySystemId): JsonResponse
     {
         try {
-            $remedies = Remedy::with(['remedyType', 'bodySystem'])
+            $remedies = Remedy::with(['remedyType', 'bodySystem', 'remedyTypes', 'bodySystems'])
                 ->where('status', 'active')
-                ->where('body_system_id', $bodySystemId)
+                ->where(function ($q) use ($bodySystemId) {
+                    $q->where('body_system_id', $bodySystemId)
+                      ->orWhereHas('bodySystems', function ($qq) use ($bodySystemId) {
+                          $qq->where('body_systems.id', $bodySystemId);
+                      });
+                })
                 ->orderBy('created_at', 'desc')
                 ->get();
 

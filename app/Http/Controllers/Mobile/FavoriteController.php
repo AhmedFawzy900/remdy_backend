@@ -37,7 +37,7 @@ class FavoriteController extends Controller
                 ], 422);
             }
 
-            $user = Auth::user();
+            $user = auth('sanctum')->user();
             $itemId = $request->item_id;
             $type = $request->type;
 
@@ -111,7 +111,7 @@ class FavoriteController extends Controller
                 ], 422);
             }
 
-            $user = Auth::user();
+            $user = auth('sanctum')->user();
             $itemId = $request->item_id;
             $type = $request->type;
 
@@ -159,13 +159,15 @@ class FavoriteController extends Controller
     public function getFavorites(Request $request): JsonResponse
     {
         try {
-            $user = Auth::user();
+            $user = auth('sanctum')->user();
             $type = $request->get('type', 'all'); // all, remedy, article, course, video
 
             $favorites = [];
-
+           
             if ($type === 'all' || $type === 'remedy') {
+                
                 $remedyFavorites = $user->favoriteRemedies()->with(['remedyType', 'bodySystem'])->get();
+                
                 $favorites['remedies'] = RemedyResource::collection($remedyFavorites);
             }
 
@@ -217,7 +219,7 @@ class FavoriteController extends Controller
                 ], 422);
             }
 
-            $user = Auth::user();
+            $user = auth('sanctum')->user();
             $itemId = $request->item_id;
             $type = $request->type;
 
@@ -258,7 +260,7 @@ class FavoriteController extends Controller
     public function clearFavorites(Request $request): JsonResponse
     {
         try {
-            $user = Auth::user();
+            $user = auth('sanctum')->user();
             $type = $request->get('type', 'all'); // all, remedy, article, course, video
 
             if ($type === 'all') {

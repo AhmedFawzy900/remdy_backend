@@ -26,8 +26,9 @@ class HomeController extends Controller
     public function index(): JsonResponse
     {
         try {
-            // Get active ads
-            $ads = Ad::where('status', 'active')
+            // Get active ads for home placement
+            $ads = Ad::active()
+                ->where('type', Ad::TYPE_HOME)
                 ->orderBy('created_at', 'desc')
                 ->limit(10)
                 ->get();
@@ -41,8 +42,8 @@ class HomeController extends Controller
             ->limit(10)
             ->get();
 
-            // Get latest remedies
-            $remedies = Remedy::with(['reviews.user','remedyType','bodySystem','diseaseRelation'])->where('status', 'active')
+            // Get latest remedies (eager-load plural relations for lists)
+            $remedies = Remedy::with(['reviews.user','remedyType','bodySystem','diseaseRelation','remedyTypes','bodySystems','diseases'])->where('status', 'active')
                 ->orderBy('created_at', 'desc')
                 ->limit(10)
                 ->get();

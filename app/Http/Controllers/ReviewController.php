@@ -56,7 +56,7 @@ class ReviewController extends Controller
             $perPage = $request->get('per_page', 15);
             $perPage = min($perPage, 100);
             $reviews = $query->paginate($perPage);
-
+           
             return response()->json([
                 'success' => true,
                 'data' => ReviewResource::collection($reviews),

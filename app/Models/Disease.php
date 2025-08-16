@@ -31,4 +31,10 @@ class Disease extends Model
     {
         return $query->where('status', self::STATUS_INACTIVE);
     }
+
+    // New: many-to-many relation to remedies
+    public function remedies()
+    {
+        return $this->belongsToMany(Remedy::class, 'disease_remedy');
+    }
 }

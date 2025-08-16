@@ -51,7 +51,7 @@ class Review extends Model
 
     public function reactions()
     {
-        return $this->hasMany(ReviewReaction::class);
+        return $this->hasMany(ReviewReaction::class, 'review_id', 'id');
     }
 
     public function likes()

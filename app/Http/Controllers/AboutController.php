@@ -16,45 +16,18 @@ class AboutController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = About::query();
+            $about = About::first();
 
-            // Filter by main_description
-            if ($request->has('main_description') && $request->main_description) {
-                $query->where('main_description', 'like', '%' . $request->main_description . '%');
+            if (!$about) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'About data not found'
+                ], 404);
             }
-
-            // General search
-            if ($request->has('search') && $request->search) {
-                $search = $request->search;
-                $query->where('main_description', 'like', '%' . $search . '%');
-            }
-
-            // Sort by field
-            $sortBy = $request->get('sort_by', 'created_at');
-            $sortOrder = $request->get('sort_order', 'desc');
-            
-            if (in_array($sortBy, ['main_description', 'created_at', 'updated_at'])) {
-                $query->orderBy($sortBy, $sortOrder);
-            }
-
-            // Pagination
-            $perPage = $request->get('per_page', 15);
-            $perPage = min($perPage, 100); // Limit max per page to 100
-            
-            $abouts = $query->paginate($perPage);
 
             return response()->json([
                 'success' => true,
-                'data' => AboutResource::collection($abouts),
-                'pagination' => [
-                    'current_page' => $abouts->currentPage(),
-                    'last_page' => $abouts->lastPage(),
-                    'per_page' => $abouts->perPage(),
-                    'total' => $abouts->total(),
-                    'from' => $abouts->firstItem(),
-                    'to' => $abouts->lastItem(),
-                    'has_more_pages' => $abouts->hasMorePages(),
-                ],
+                'data' => new AboutResource($about),
                 'message' => 'About data retrieved successfully'
             ], 200);
         } catch (\Exception $e) {
@@ -84,15 +57,28 @@ class AboutController extends Controller
                 ], 422);
             }
 
-            $about = About::create([
-                'main_description' => $request->mainDescription,
-            ]);
+            $existingAbout = About::first();
+
+            if ($existingAbout) {
+                $existingAbout->update([
+                    'main_description' => $request->mainDescription,
+                ]);
+                $about = $existingAbout;
+                $statusCode = 200;
+                $message = 'About data updated successfully';
+            } else {
+                $about = About::create([
+                    'main_description' => $request->mainDescription,
+                ]);
+                $statusCode = 201;
+                $message = 'About data created successfully';
+            }
 
             return response()->json([
                 'success' => true,
                 'data' => new AboutResource($about),
-                'message' => 'About data created successfully'
-            ], 201);
+                'message' => $message
+            ], $statusCode);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -108,7 +94,7 @@ class AboutController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $about = About::find($id);
+            $about = About::first();
             if (!$about) {
                 return response()->json([
                     'success' => false,
@@ -135,13 +121,7 @@ class AboutController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         try {
-            $about = About::find($id);
-            if (!$about) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'About data not found'
-                ], 404);
-            }
+            $about = About::first();
 
             $validator = Validator::make($request->all(), [
                 'mainDescription' => 'sometimes|required|string',
@@ -155,15 +135,32 @@ class AboutController extends Controller
                 ], 422);
             }
 
-            $about->update([
-                'main_description' => $request->mainDescription ?? $about->main_description,
-            ]);
+            if ($about) {
+                $about->update([
+                    'main_description' => $request->mainDescription ?? $about->main_description,
+                ]);
+                $message = 'About data updated successfully';
+                $statusCode = 200;
+            } else {
+                // Create if not exists
+                if (!$request->has('mainDescription')) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'mainDescription is required to create about data'
+                    ], 422);
+                }
+                $about = About::create([
+                    'main_description' => $request->mainDescription,
+                ]);
+                $message = 'About data created successfully';
+                $statusCode = 201;
+            }
 
             return response()->json([
                 'success' => true,
                 'data' => new AboutResource($about),
-                'message' => 'About data updated successfully'
-            ], 200);
+                'message' => $message
+            ], $statusCode);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -179,7 +176,7 @@ class AboutController extends Controller
     public function destroy(string $id): JsonResponse
     {
         try {
-            $about = About::find($id);
+            $about = About::first();
             if (!$about) {
                 return response()->json([
                     'success' => false,

@@ -32,6 +32,8 @@ class User extends Authenticatable
         'otp_source',
         'otp_expired_date',
         'code_usage',
+        'google_id',
+        'apple_id',
     ];
 
     /**
@@ -120,7 +122,7 @@ class User extends Authenticatable
     public function favoriteRemedies()
     {
         return $this->belongsToMany(Remedy::class, 'favorites', 'user_id', 'favoritable_id')
-            ->where('favoritable_type', Remedy::class);
+            ->where('favoritable_type', 'remedy');
     }
 
     /**
@@ -129,7 +131,7 @@ class User extends Authenticatable
     public function favoriteArticles()
     {
         return $this->belongsToMany(Article::class, 'favorites', 'user_id', 'favoritable_id')
-            ->where('favoritable_type', Article::class);
+            ->where('favoritable_type', 'article');
     }
 
     /**
@@ -138,7 +140,7 @@ class User extends Authenticatable
     public function favoriteCourses()
     {
         return $this->belongsToMany(Course::class, 'favorites', 'user_id', 'favoritable_id')
-            ->where('favoritable_type', Course::class);
+            ->where('favoritable_type', 'course');
     }
 
     /**
@@ -147,7 +149,7 @@ class User extends Authenticatable
     public function favoriteVideos()
     {
         return $this->belongsToMany(Video::class, 'favorites', 'user_id', 'favoritable_id')
-            ->where('favoritable_type', Video::class);
+            ->where('favoritable_type', 'video');
     }
 
     /**
@@ -172,5 +174,26 @@ class User extends Authenticatable
     public function lessonProgress()
     {
         return $this->hasMany(LessonProgress::class);
+    }
+
+    public function deviceTokens()
+    {
+        return $this->hasMany(DeviceToken::class);
+    }
+
+    public function scopeFilterForNotification($query, array $conditions)
+    {
+        // Filter by IDs if provided (companies or individual users)
+        // if (!empty($conditions['users'])) {
+        //     $query->whereIn('id', $conditions['users']);
+        // }
+        $query->where('account_verification', 'yes');
+        // Return only id and fcm_token
+        return $query->with('deviceTokens:token,user_id')->get()->map(function ($user) {
+            return [
+                'id' => $user->id,
+                'fcm_tokens' => $user->deviceTokens->toArray(),
+            ];
+        });
     }
 }

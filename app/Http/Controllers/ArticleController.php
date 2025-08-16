@@ -94,7 +94,7 @@ class ArticleController extends Controller
                 'plants.*.image' => 'nullable|url',
                 'plants.*.title' => 'required|string',
                 'plants.*.description' => 'required|string',
-                'plans' => 'nullable|string|in:basic,premium,pro',
+                'plans' => 'nullable',
                 'status' => 'sometimes|in:active,inactive',
             ]);
 

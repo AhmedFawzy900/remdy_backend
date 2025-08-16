@@ -19,7 +19,8 @@ class Reminder extends Model
         'user_id',
         'element_type',
         'element_id',
-        'day',
+        'days',
+        'day', // Keep for backward compatibility during transition
         'time',
         'is_active',
     ];
@@ -32,6 +33,7 @@ class Reminder extends Model
     protected $casts = [
         'time' => 'datetime:H:i:s',
         'is_active' => 'boolean',
+        'days' => 'array',
     ];
 
     /**
@@ -63,7 +65,10 @@ class Reminder extends Model
      */
     public function scopeForDay($query, $day)
     {
-        return $query->where('day', $day);
+        return $query->where(function ($q) use ($day) {
+            $q->whereJsonContains('days', $day)
+              ->orWhere('day', $day);
+        });
     }
 
     /**
@@ -71,7 +76,29 @@ class Reminder extends Model
      */
     public function scopeForAllDays($query)
     {
-        return $query->whereNull('day');
+        return $query->where(function ($q) {
+            $q->whereNull('days')
+              ->orWhereNull('day');
+        });
+    }
+
+    /**
+     * Scope a query to only include reminders that have any of the specified days.
+     */
+    public function scopeForAnyDay($query, $days)
+    {
+        if (is_array($days)) {
+            return $query->where(function ($q) use ($days) {
+                foreach ($days as $day) {
+                    $q->orWhereJsonContains('days', $day)
+                      ->orWhere('day', $day);
+                }
+            });
+        }
+        return $query->where(function ($q) use ($days) {
+            $q->whereJsonContains('days', $days)
+              ->orWhere('day', $days);
+        });
     }
 
     /**
@@ -83,14 +110,32 @@ class Reminder extends Model
     }
 
     /**
-     * Get the day name for display.
+     * Get the day names for display.
+     */
+    public function getDayNamesAttribute()
+    {
+        // Handle both new 'days' column and old 'day' column during transition
+        if ($this->days) {
+            if (empty($this->days)) {
+                return 'All Days';
+            }
+            $dayNames = array_map('ucfirst', $this->days);
+            return implode(', ', $dayNames);
+        }
+        
+        // Fallback to old 'day' column if 'days' is not set
+        if ($this->day) {
+            return ucfirst($this->day);
+        }
+        
+        return 'All Days';
+    }
+
+    /**
+     * Get the day name for display (backward compatibility).
      */
     public function getDayNameAttribute()
     {
-        if (!$this->day) {
-            return 'All Days';
-        }
-        
-        return ucfirst($this->day);
+        return $this->day_names;
     }
 } 

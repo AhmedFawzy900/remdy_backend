@@ -21,8 +21,10 @@ use App\Http\Controllers\ImageUploadController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\AdController;
+use App\Http\Controllers\DeviceTokensController;
 use App\Http\Controllers\InstructorController;
 use App\Http\Controllers\LessonController;
+use App\Http\Controllers\OutNotificationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -49,11 +51,16 @@ Route::post('auth/admin/refresh', [AuthController::class, 'refreshAdminToken']);
 
 // Mobile Authentication Routes
 Route::prefix('mobile/auth')->group(function () {
-    Route::post('register', [App\Http\Controllers\Mobile\AuthController::class, 'register']);
-    Route::post('login', [App\Http\Controllers\Mobile\AuthController::class, 'login']);
-    Route::post('send-email', [App\Http\Controllers\Mobile\AuthController::class, 'sendEmail']);
-    Route::post('check-code', [App\Http\Controllers\Mobile\AuthController::class, 'checkCode']);
-    Route::post('forget-password', [App\Http\Controllers\Mobile\AuthController::class, 'forgetPassword']);
+Route::post('register', [App\Http\Controllers\Mobile\AuthController::class, 'register']);
+Route::post('login', [App\Http\Controllers\Mobile\AuthController::class, 'login']);
+Route::post('login/google', [App\Http\Controllers\Mobile\AuthController::class, 'loginWithGoogle']);
+Route::post('login/apple', [App\Http\Controllers\Mobile\AuthController::class, 'loginWithApple']);
+Route::get('oauth/urls', [App\Http\Controllers\Mobile\AuthController::class, 'getOAuthUrls']);
+Route::post('oauth/google/callback', [App\Http\Controllers\Mobile\AuthController::class, 'googleCallback']);
+Route::post('oauth/apple/callback', [App\Http\Controllers\Mobile\AuthController::class, 'appleCallback']);
+Route::post('send-email', [App\Http\Controllers\Mobile\AuthController::class, 'sendEmail']);
+Route::post('check-code', [App\Http\Controllers\Mobile\AuthController::class, 'checkCode']);
+Route::post('forget-password', [App\Http\Controllers\Mobile\AuthController::class, 'forgetPassword']);
     
     // Protected routes (require authentication)
     Route::middleware('auth:sanctum')->group(function () {
@@ -96,7 +103,7 @@ Route::prefix('mobile')->middleware('auth:sanctum')->group(function () {
     Route::get('my-courses', [App\Http\Controllers\Mobile\CourseController::class, 'myCourses']);
     Route::prefix('courses')->group(function () {
         Route::get('available', [App\Http\Controllers\Mobile\CourseController::class, 'availableCourses']);
-        Route::get('{courseId}', [App\Http\Controllers\Mobile\CourseController::class, 'showCourse']);
+        // Route::get('{courseId}', [App\Http\Controllers\Mobile\CourseController::class, 'showCourse']);
         Route::post('{courseId}/start', [App\Http\Controllers\Mobile\CourseController::class, 'startCourse']);
         Route::get('{courseId}/lessons', [App\Http\Controllers\Mobile\CourseController::class, 'getLessonsByCourse']);
         Route::get('{courseId}/progress', [App\Http\Controllers\Mobile\CourseController::class, 'getLessonProgressSummary']);
@@ -151,7 +158,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('lessons', LessonController::class);
     Route::patch('lessons/{id}/toggle-status', [LessonController::class, 'toggleStatus']);
     Route::get('courses/{courseId}/lessons', [LessonController::class, 'byCourse']);
-    
+    Route::post('send-notification', [OutNotificationController::class, 'sendNotification']);
     // Lesson Content Blocks Routes
     Route::prefix('lessons/{lessonId}/content-blocks')->group(function () {
         Route::get('/', [App\Http\Controllers\LessonContentBlockController::class, 'index']);
@@ -214,4 +221,10 @@ Route::prefix('mobile')->group(function () {
     Route::post('contact-us', [ContactUsController::class, 'store']);
     Route::get('contact-us', [ContactUsController::class, 'index']);
     Route::get('contact-us/{id}', [ContactUsController::class, 'show']);
+    Route::post('update-token', [DeviceTokensController::class, 'updateToken']);
+
+    Route::get('notifications', [App\Http\Controllers\Mobile\OutNotificationController::class, 'index']);
+    Route::get('notifications/{id}', [App\Http\Controllers\Mobile\OutNotificationController::class, 'show']);
+    Route::get('notifications/guest', [App\Http\Controllers\Mobile\OutNotificationController::class, 'getNotificationForGuest']);
+
 });

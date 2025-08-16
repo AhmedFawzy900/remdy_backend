@@ -90,7 +90,8 @@ class ReminderController extends Controller
             $validator = Validator::make($request->all(), [
                 'element_type' => 'required|string|in:remedy,article,course,video',
                 'element_id' => 'required|integer|min:1',
-                'day' => 'nullable|string|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
+                'days' => 'nullable|array',
+                'days.*' => 'string|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
                 'time' => 'required|string|date_format:H:i',
             ]);
 
@@ -104,11 +105,10 @@ class ReminderController extends Controller
 
             $user = $request->user();
 
-            // Check if reminder already exists
+            // Check if reminder already exists for the same element and time
             $existingReminder = Reminder::where('user_id', $user->id)
                 ->where('element_type', $request->element_type)
                 ->where('element_id', $request->element_id)
-                ->where('day', $request->day)
                 ->where('time', $request->time)
                 ->first();
 
@@ -124,7 +124,7 @@ class ReminderController extends Controller
                 'user_id' => $user->id,
                 'element_type' => $request->element_type,
                 'element_id' => $request->element_id,
-                'day' => $request->day, // null for all days
+                'days' => $request->days, // null for all days, array for specific days
                 'time' => $request->time,
                 'is_active' => true,
             ]);
@@ -139,8 +139,8 @@ class ReminderController extends Controller
                     'id' => $reminder->id,
                     'element_type' => $reminder->element_type,
                     'element' => $elementData,
-                    'day' => $reminder->day,
-                    'day_name' => $reminder->day_name,
+                    'days' => $reminder->days,
+                    'day_names' => $reminder->day_names,
                     'time' => $reminder->time->format('H:i'),
                     'formatted_time' => $reminder->formatted_time,
                     'is_active' => $reminder->is_active,
@@ -169,7 +169,6 @@ class ReminderController extends Controller
 
             $reminders = Reminder::where('user_id', $user->id)
                 ->orderBy('time')
-                ->orderBy('day')
                 ->paginate($perPage);
 
             $remindersData = $reminders->getCollection()->map(function ($reminder) {
@@ -179,8 +178,8 @@ class ReminderController extends Controller
                     'id' => $reminder->id,
                     'element_type' => $reminder->element_type,
                     'element' => $elementData,
-                    'day' => $reminder->day,
-                    'day_name' => $reminder->day_name,
+                    'days' => $reminder->days,
+                    'day_names' => $reminder->day_names,
                     'time' => $reminder->time->format('H:i'),
                     'formatted_time' => $reminder->formatted_time,
                     'is_active' => $reminder->is_active,
@@ -219,7 +218,8 @@ class ReminderController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'day' => 'nullable|string|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
+                'days' => 'nullable|array',
+                'days.*' => 'string|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
                 'time' => 'required|string|date_format:H:i',
                 'is_active' => 'boolean',
             ]);
@@ -246,7 +246,6 @@ class ReminderController extends Controller
             $existingReminder = Reminder::where('user_id', $user->id)
                 ->where('element_type', $reminder->element_type)
                 ->where('element_id', $reminder->element_id)
-                ->where('day', $request->day)
                 ->where('time', $request->time)
                 ->where('id', '!=', $id)
                 ->first();
@@ -259,7 +258,7 @@ class ReminderController extends Controller
             }
 
             $reminder->update([
-                'day' => $request->day,
+                'days' => $request->days,
                 'time' => $request->time,
                 'is_active' => $request->has('is_active') ? $request->is_active : $reminder->is_active,
             ]);
@@ -274,8 +273,8 @@ class ReminderController extends Controller
                     'id' => $reminder->id,
                     'element_type' => $reminder->element_type,
                     'element' => $elementData,
-                    'day' => $reminder->day,
-                    'day_name' => $reminder->day_name,
+                    'days' => $reminder->days,
+                    'day_names' => $reminder->day_names,
                     'time' => $reminder->time->format('H:i'),
                     'formatted_time' => $reminder->formatted_time,
                     'is_active' => $reminder->is_active,

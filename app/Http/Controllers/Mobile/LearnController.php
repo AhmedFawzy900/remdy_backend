@@ -26,7 +26,7 @@ class LearnController extends Controller
     {
         try {
             // Get top rated remedies (by average rating)
-            $topRemedies = Remedy::with(['remedyType', 'bodySystem', 'reviews.user', 'reviews.reactions','diseaseRelation'])
+            $topRemedies = Remedy::with(['remedyType', 'bodySystem', 'reviews.user', 'reviews.reactions','diseaseRelation','remedyTypes','bodySystems','diseases'])
                 ->where('status', 'active')
                 ->withAvg('reviews', 'rate')
                 ->orderBy('reviews_avg_rate', 'desc')

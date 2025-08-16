@@ -10,6 +10,7 @@ use App\Http\Resources\LessonIndexResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 
 class LessonController extends Controller
 {
@@ -96,7 +97,7 @@ class LessonController extends Controller
                 'status' => 'nullable|in:active,inactive',
                 'content_blocks' => 'nullable|array',
                 'content_blocks.*.type' => 'required_with:content_blocks|string|in:' . implode(',', LessonContentBlock::getAvailableTypes()),
-                'content_blocks.*.title' => 'required_with:content_blocks|string|max:255',
+                'content_blocks.*.title' => 'nullable|string|max:255',
                 'content_blocks.*.description' => 'nullable|string',
                 'content_blocks.*.image_url' => 'nullable|url',
                 'content_blocks.*.video_url' => 'nullable|url',
@@ -215,7 +216,7 @@ class LessonController extends Controller
                 'content_blocks' => 'nullable|array',
                 'content_blocks.*.id' => 'nullable|exists:lesson_content_blocks,id',
                 'content_blocks.*.type' => 'required_with:content_blocks|string|in:' . implode(',', LessonContentBlock::getAvailableTypes()),
-                'content_blocks.*.title' => 'required_with:content_blocks|string|max:255',
+                'content_blocks.*.title' => 'nullable|string|max:255',
                 'content_blocks.*.description' => 'nullable|string',
                 'content_blocks.*.image_url' => 'nullable|url',
                 'content_blocks.*.video_url' => 'nullable|url',
@@ -235,51 +236,57 @@ class LessonController extends Controller
             }
 
             $validatedData = $validator->validated();
-            $contentBlocks = $validatedData['content_blocks'] ?? [];
+            $contentBlocks = $validatedData['content_blocks'] ?? null; // null if not provided
             unset($validatedData['content_blocks']);
 
-            // Update lesson basic info
-            $lesson->update($validatedData);
-
-            // Handle content blocks update
-            if (!empty($contentBlocks)) {
+            // Pre-validate content structures to avoid partial updates
+            if ($contentBlocks !== null) {
                 foreach ($contentBlocks as $blockData) {
-                    if (isset($blockData['id'])) {
-                        // Update existing block
-                        $existingBlock = $lesson->contentBlocks()->find($blockData['id']);
-                        if ($existingBlock) {
-                            // Validate content structure based on type
-                            if (isset($blockData['content'])) {
-                                $contentValidation = $this->validateContentBlockByType($blockData['type'], $blockData['content']);
-                                if (!$contentValidation['valid']) {
-                                    return response()->json([
-                                        'success' => false,
-                                        'message' => 'Content block validation failed',
-                                        'errors' => $contentValidation['errors']
-                                    ], 422);
-                                }
-                            }
-                            
-                            $existingBlock->update($blockData);
-                        }
-                    } else {
-                        // Create new block
-                        $blockData['lesson_id'] = $lesson->id;
-                        
-                        // Validate content structure based on type
-                        $contentValidation = $this->validateContentBlockByType($blockData['type'], $blockData['content'] ?? []);
-                        if (!$contentValidation['valid']) {
-                            return response()->json([
-                                'success' => false,
-                                'message' => 'Content block validation failed',
-                                'errors' => $contentValidation['errors']
-                            ], 422);
-                        }
-                        
-                        LessonContentBlock::create($blockData);
+                    $type = $blockData['type'] ?? '';
+                    $contentArray = $blockData['content'] ?? [];
+                    $contentValidation = $this->validateContentBlockByType($type, $contentArray);
+                    if (!$contentValidation['valid']) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Content block validation failed',
+                            'errors' => $contentValidation['errors']
+                        ], 422);
                     }
                 }
             }
+
+            DB::transaction(function () use ($lesson, $validatedData, $contentBlocks) {
+                // Update lesson basic info
+                $lesson->update($validatedData);
+
+                // Only sync content blocks if key is present in request (including empty array to clear all)
+                if ($contentBlocks !== null) {
+                    // Delete blocks that are not present in the incoming payload
+                    $existingIds = $lesson->contentBlocks()->pluck('id')->toArray();
+                    $incomingIds = array_values(array_filter(array_map(function ($block) {
+                        return $block['id'] ?? null;
+                    }, $contentBlocks)));
+                    $idsToDelete = array_diff($existingIds, $incomingIds);
+                    if (!empty($idsToDelete)) {
+                        $lesson->contentBlocks()->whereIn('id', $idsToDelete)->delete();
+                    }
+
+                    // Upsert provided blocks
+                    foreach ($contentBlocks as $blockData) {
+                        if (isset($blockData['id'])) {
+                            // Update existing block restricted to this lesson
+                            $existingBlock = $lesson->contentBlocks()->find($blockData['id']);
+                            if ($existingBlock) {
+                                $existingBlock->update($blockData);
+                            }
+                        } else {
+                            // Create new block
+                            $blockData['lesson_id'] = $lesson->id;
+                            LessonContentBlock::create($blockData);
+                        }
+                    }
+                }
+            });
 
             // Load the lesson with updated content blocks and remedy relationships
             $lesson->load(['contentBlocks' => function($query) {

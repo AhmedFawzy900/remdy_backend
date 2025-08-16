@@ -147,10 +147,14 @@ class VideoController extends Controller
             // Get related videos with similar content
             $relatedVideos = $this->getRelatedVideos($video);
 
+            // Targeted ads for this video
+            $ads = \App\Models\Ad::active()->forPlacement(\App\Models\Ad::TYPE_VIDEO, (int)$video->id)->orderBy('created_at', 'desc')->get();
+
             return response()->json([
                 'success' => true,
                 'data' => new VideoResource($video),
                 'related_videos' => VideoResource::collection($relatedVideos),
+                'ads' => \App\Http\Resources\AdResource::collection($ads),
                 'message' => 'Video retrieved successfully'
             ], 200);
         } catch (\Exception $e) {

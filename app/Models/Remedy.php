@@ -55,6 +55,22 @@ class Remedy extends Model
         return $this->belongsTo(Disease::class, 'disease_id');
     }
 
+    // New: many-to-many relations (backward-compatible in parallel with singular)
+    public function remedyTypes()
+    {
+        return $this->belongsToMany(RemedyType::class, 'remedy_remedy_type');
+    }
+
+    public function bodySystems()
+    {
+        return $this->belongsToMany(BodySystem::class, 'body_system_remedy');
+    }
+
+    public function diseases()
+    {
+        return $this->belongsToMany(Disease::class, 'disease_remedy');
+    }
+
     public function reviews()
     {
         return $this->hasMany(Review::class, 'element_id')->where('type', 'remedy')->where('status', 'accepted');

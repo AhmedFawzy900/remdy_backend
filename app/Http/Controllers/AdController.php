@@ -28,6 +28,16 @@ class AdController extends Controller
                 $query->where('status', $request->status);
             }
 
+            // Filter by placement type
+            if ($request->has('type') && $request->type) {
+                $query->where('type', $request->type);
+            }
+
+            // Filter by element id
+            if ($request->has('element_id') && $request->element_id !== null) {
+                $query->where('element_id', $request->element_id);
+            }
+
             // General search
             if ($request->has('search') && $request->search) {
                 $search = $request->search;
@@ -90,6 +100,8 @@ class AdController extends Controller
                 'image' => 'nullable|url',
                 'url' => 'nullable|url',
                 'status' => 'sometimes|in:active,inactive',
+                'type' => 'required|in:home,remedy,video,course',
+                'element_id' => 'required_unless:type,home|integer',
             ]);
 
             if ($validator->fails()) {
@@ -105,6 +117,8 @@ class AdController extends Controller
                 'image' => $request->image,
                 'url' => $request->url,
                 'status' => $request->status ?? Ad::STATUS_ACTIVE,
+                'type' => $request->type,
+                'element_id' => $request->type === Ad::TYPE_HOME ? null : $request->element_id,
             ]);
 
             return response()->json([
@@ -178,6 +192,8 @@ class AdController extends Controller
                 'image' => 'nullable|url',
                 'url' => 'nullable|url',
                 'status' => 'sometimes|in:active,inactive',
+                'type' => 'sometimes|in:home,remedy,video,course',
+                'element_id' => 'sometimes|required_unless:type,home|integer',
             ]);
 
             if ($validator->fails()) {
@@ -275,7 +291,12 @@ class AdController extends Controller
     public function active(): JsonResponse
     {
         try {
-            $ads = Ad::where('status', 'active')
+            $type = request()->get('type');
+            $elementId = request()->get('element_id');
+
+            $ads = Ad::active()
+                ->when($type, fn($q) => $q->where('type', $type))
+                ->when($elementId !== null, fn($q) => $q->where('element_id', $elementId))
                 ->orderBy('created_at', 'desc')
                 ->get();
 

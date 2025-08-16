@@ -70,6 +70,28 @@ class CourseDetailResource extends JsonResource
             $data['is_fav'] = false;
         }
 
+        // Coming lesson id based on progress (first not-completed lesson, or first lesson if none started)
+        $comingLessonId = null;
+        $lessons = $this->lessons ?? collect();
+        if ($lessons && $lessons->count() > 0) {
+            if ($user) {
+                $progressByLessonId = \App\Models\LessonProgress::where('user_id', $user->id)
+                    ->where('course_id', $this->id)
+                    ->get()
+                    ->keyBy('lesson_id');
+
+                $nextLesson = $lessons->first(function ($lesson) use ($progressByLessonId) {
+                    $progress = $progressByLessonId->get($lesson->id);
+                    return !$progress || $progress->status !== 'completed';
+                });
+
+                $comingLessonId = $nextLesson ? $nextLesson->id : null;
+            } else {
+                $comingLessonId = $lessons->first()->id;
+            }
+        }
+        $data['coming_lesson_id'] = $comingLessonId;
+
         return $data;
     }
 } 

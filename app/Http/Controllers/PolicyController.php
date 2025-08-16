@@ -16,56 +16,36 @@ class PolicyController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Policy::query();
+            $validator = Validator::make($request->all(), [
+                'type' => 'required|in:privacy,terms',
+            ]);
 
-            // Filter by type
-            if ($request->has('type') && $request->type) {
-                $query->where('type', $request->type);
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
             }
 
-            // Filter by status
-            if ($request->has('status') && $request->status) {
-                $query->where('status', $request->status);
-            }
+            $policy = Policy::where('type', $request->type)->first();
 
-            // General search
-            if ($request->has('search') && $request->search) {
-                $search = $request->search;
-                $query->where(function($q) use ($search) {
-                    $q->where('content', 'like', '%' . $search . '%');
-                });
+            if (!$policy) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Policy not found'
+                ], 404);
             }
-
-            // Sort by field
-            $sortBy = $request->get('sort_by', 'created_at');
-            $sortOrder = $request->get('sort_order', 'desc');
-            if (in_array($sortBy, ['type', 'status', 'created_at', 'updated_at'])) {
-                $query->orderBy($sortBy, $sortOrder);
-            }
-
-            // Pagination
-            $perPage = $request->get('per_page', 15);
-            $perPage = min($perPage, 100);
-            $policies = $query->paginate($perPage);
 
             return response()->json([
                 'success' => true,
-                'data' => PolicyResource::collection($policies),
-                'pagination' => [
-                    'current_page' => $policies->currentPage(),
-                    'last_page' => $policies->lastPage(),
-                    'per_page' => $policies->perPage(),
-                    'total' => $policies->total(),
-                    'from' => $policies->firstItem(),
-                    'to' => $policies->lastItem(),
-                    'has_more_pages' => $policies->hasMorePages(),
-                ],
-                'message' => 'Policies retrieved successfully'
+                'data' => new PolicyResource($policy),
+                'message' => 'Policy retrieved successfully'
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve policies',
+                'message' => 'Failed to retrieve policy',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -91,17 +71,31 @@ class PolicyController extends Controller
                 ], 422);
             }
 
-            $policy = Policy::create([
-                'type' => $request->type,
-                'content' => $request->content,
-                'status' => $request->status ?? Policy::STATUS_ACTIVE,
-            ]);
+            $existingPolicy = Policy::where('type', $request->type)->first();
+
+            if ($existingPolicy) {
+                $existingPolicy->update([
+                    'content' => $request->content,
+                    'status' => $request->status ?? $existingPolicy->status,
+                ]);
+                $policy = $existingPolicy;
+                $statusCode = 200;
+                $message = 'Policy updated successfully';
+            } else {
+                $policy = Policy::create([
+                    'type' => $request->type,
+                    'content' => $request->content,
+                    'status' => $request->status ?? Policy::STATUS_ACTIVE,
+                ]);
+                $statusCode = 201;
+                $message = 'Policy created successfully';
+            }
 
             return response()->json([
                 'success' => true,
                 'data' => new PolicyResource($policy),
-                'message' => 'Policy created successfully'
-            ], 201);
+                'message' => $message
+            ], $statusCode);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -114,10 +108,22 @@ class PolicyController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
         try {
-            $policy = Policy::find($id);
+            $validator = Validator::make($request->all(), [
+                'type' => 'required|in:privacy,terms',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $policy = Policy::where('type', $request->type)->first();
             if (!$policy) {
                 return response()->json([
                     'success' => false,
@@ -144,16 +150,8 @@ class PolicyController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         try {
-            $policy = Policy::find($id);
-            if (!$policy) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Policy not found'
-                ], 404);
-            }
-
             $validator = Validator::make($request->all(), [
-                'type' => 'sometimes|required|in:privacy,terms',
+                'type' => 'required|in:privacy,terms',
                 'content' => 'sometimes|required|string',
                 'status' => 'sometimes|in:active,inactive',
             ]);
@@ -166,13 +164,33 @@ class PolicyController extends Controller
                 ], 422);
             }
 
-            $policy->update($request->all());
+            $policy = Policy::where('type', $request->type)->first();
+
+            if ($policy) {
+                $policy->update($request->only(['content', 'status']));
+                $message = 'Policy updated successfully';
+                $statusCode = 200;
+            } else {
+                if (!$request->has('content')) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Content is required to create policy'
+                    ], 422);
+                }
+                $policy = Policy::create([
+                    'type' => $request->type,
+                    'content' => $request->content,
+                    'status' => $request->status ?? Policy::STATUS_ACTIVE,
+                ]);
+                $message = 'Policy created successfully';
+                $statusCode = 201;
+            }
 
             return response()->json([
                 'success' => true,
                 'data' => new PolicyResource($policy),
-                'message' => 'Policy updated successfully'
-            ], 200);
+                'message' => $message
+            ], $statusCode);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -185,10 +203,22 @@ class PolicyController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
         try {
-            $policy = Policy::find($id);
+            $validator = Validator::make($request->all(), [
+                'type' => 'required|in:privacy,terms',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $policy = Policy::where('type', $request->type)->first();
             if (!$policy) {
                 return response()->json([
                     'success' => false,
@@ -212,10 +242,22 @@ class PolicyController extends Controller
     /**
      * Toggle the status of the specified resource.
      */
-    public function toggleStatus(string $id): JsonResponse
+    public function toggleStatus(Request $request, string $id): JsonResponse
     {
         try {
-            $policy = Policy::find($id);
+            $validator = Validator::make($request->all(), [
+                'type' => 'required|in:privacy,terms',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $policy = Policy::where('type', $request->type)->first();
             if (!$policy) {
                 return response()->json([
                     'success' => false,

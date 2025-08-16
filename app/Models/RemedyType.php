@@ -34,4 +34,10 @@ class RemedyType extends Model
     {
         return $this->hasMany(Remedy::class, 'remedy_type_id');
     }
+
+    // New: many-to-many relation (kept alongside hasMany for BC)
+    public function remediesMany()
+    {
+        return $this->belongsToMany(Remedy::class, 'remedy_remedy_type');
+    }
 }

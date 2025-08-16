@@ -32,7 +32,7 @@ class RemedyDashboardResource extends JsonResource
 
         ];
 
-        // Add full relationships data for dashboard
+        // Add full relationships data for dashboard (singular for backward-compatibility)
         if ($this->relationLoaded('remedyType') && $this->remedyType) {
             $data['remedy_type'] = new RemedyTypeResource($this->remedyType);
         }
@@ -45,10 +45,22 @@ class RemedyDashboardResource extends JsonResource
             $data['disease_relation'] = new DiseaseResource($this->diseaseRelation);
         }
 
-       
+        // New: plural arrays (ids and full objects) when loaded
+        if ($this->relationLoaded('remedyTypes')) {
+            $data['remedy_type_ids'] = $this->remedyTypes->pluck('id');
+            $data['remedy_types'] = RemedyTypeResource::collection($this->remedyTypes);
+        }
+        if ($this->relationLoaded('bodySystems')) {
+            $data['body_system_ids'] = $this->bodySystems->pluck('id');
+            $data['body_systems'] = BodySystemResource::collection($this->bodySystems);
+        }
+        if ($this->relationLoaded('diseases')) {
+            $data['disease_ids'] = $this->diseases->pluck('id');
+            $data['diseases'] = DiseaseResource::collection($this->diseases);
+        }
 
         // Add is_fav field - always present
-      
+        
 
             $data['is_fav'] = false;
         

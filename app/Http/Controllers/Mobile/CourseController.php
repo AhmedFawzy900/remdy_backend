@@ -24,7 +24,7 @@ class CourseController extends Controller
     public function availableCourses(Request $request): JsonResponse
     {
         try {
-            $user = Auth::user();
+            $user = auth('sanctum')->user();
             
             $query = Course::with(['instructor', 'lessons' => function($query) {
                 $query->active()->ordered();
@@ -98,7 +98,7 @@ class CourseController extends Controller
     public function purchaseCourse(Request $request): JsonResponse
     {
         try {
-            $user = Auth::user();
+            $user = auth('sanctum')->user();
             
             $validator = Validator::make($request->all(), [
                 'course_id' => 'required|exists:courses,id',
@@ -167,8 +167,11 @@ class CourseController extends Controller
     public function showCourse(string $courseId): JsonResponse
     {
         try {
-            $user = Auth::user();
-            
+            $purchase = null;
+            $started = false;
+            $user = auth('sanctum')->user();
+
+            if($user){
             $course = Course::with([
                 'instructors', 
                 'lessons' => function($query) {
@@ -196,12 +199,39 @@ class CourseController extends Controller
                     ->whereIn('lesson_id', $course->lessons->pluck('id'))
                     ->exists();
             }
-
+        }
+        else{
+            $course = Course::with([
+                'instructors', 
+                'lessons' => function($query) {
+                    $query->active()->ordered();
+                },
+            ])->find($courseId);
+        }
+        if(!$course){
+            return response()->json([
+                'success' => false,
+                'message' => 'Course not found'
+            ], 404);
+        }
+        if($user){
             return response()->json([
                 'success' => true,
-                'data' => new CourseDetailResource($course, $purchase, $started),
+                'data' => array_merge((new CourseDetailResource($course, $purchase, $started))->toArray(request()), [
+                'ads' => \App\Http\Resources\AdResource::collection(\App\Models\Ad::active()->forPlacement(\App\Models\Ad::TYPE_COURSE, (int)$course->id)->orderBy('created_at', 'desc')->get()),
+            ]),
                 'message' => 'Course details retrieved successfully'
             ], 200);
+        }
+        else{
+            return response()->json([
+                'success' => true,
+                'data' => array_merge((new CourseDetailResource($course))->toArray(request()), [
+                'ads' => \App\Http\Resources\AdResource::collection(\App\Models\Ad::active()->forPlacement(\App\Models\Ad::TYPE_COURSE, (int)$course->id)->orderBy('created_at', 'desc')->get()),
+            ]),
+                'message' => 'Course details retrieved successfully'
+            ], 200);
+        }
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -217,7 +247,7 @@ class CourseController extends Controller
     public function startCourse(string $courseId): JsonResponse
     {
         try {
-            $user = Auth::user();
+            $user = auth('sanctum')->user();
             
             // Check if user purchased this course
             $purchase = CoursePurchase::where('user_id', $user->id)
@@ -276,7 +306,7 @@ class CourseController extends Controller
     public function myCourses(Request $request): JsonResponse
     {
         try {
-            $user = Auth::user();
+            $user = auth('sanctum')->user();
             
             $query = Course::with([
                 'instructors',
@@ -369,7 +399,7 @@ class CourseController extends Controller
     public function completeLesson(Request $request): JsonResponse
     {
         try {
-            $user = Auth::user();
+            $user = auth('sanctum')->user();
             
             $validator = Validator::make($request->all(), [
                 'course_id' => 'required|exists:courses,id',
@@ -456,7 +486,7 @@ class CourseController extends Controller
     public function getLessonsByCourse(string $courseId, Request $request): JsonResponse
     {
         try {
-            $user = Auth::user();
+            $user = auth('sanctum')->user();
             
             // Check if user purchased this course
             $purchase = CoursePurchase::where('user_id', $user->id)
@@ -528,7 +558,7 @@ class CourseController extends Controller
     public function getLessonProgressSummary(string $courseId): JsonResponse
     {
         try {
-            $user = Auth::user();
+            $user = auth('sanctum')->user();
             
             // Check if user purchased this course
             $purchase = CoursePurchase::where('user_id', $user->id)
@@ -598,7 +628,7 @@ class CourseController extends Controller
     public function startLesson(string $courseId, string $lessonId): JsonResponse
     {
         try {
-            $user = Auth::user();
+            $user = auth('sanctum')->user();
             
             // Check if user purchased this course
             $purchase = CoursePurchase::where('user_id', $user->id)
@@ -669,7 +699,7 @@ class CourseController extends Controller
     public function getNextLesson(string $courseId, string $lessonId): JsonResponse
     {
         try {
-            $user = Auth::user();
+            $user = auth('sanctum')->user();
             
             // Check if user purchased this course
             $purchase = CoursePurchase::where('user_id', $user->id)
@@ -744,7 +774,7 @@ class CourseController extends Controller
     public function showLesson(string $courseId, string $lessonId): JsonResponse
     {
         try {
-            $user = Auth::user();
+            $user = auth('sanctum')->user();
             
             // Check if user purchased this course
             $purchase = CoursePurchase::where('user_id', $user->id)
