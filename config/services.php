@@ -48,5 +48,14 @@ return [
         'key_id' => env('APPLE_KEY_ID'),
         'team_id' => env('APPLE_TEAM_ID'),
     ],
+    'stripe' => [
+        'secret' => env('STRIPE_SECRET'),
+        'key' => env('STRIPE_KEY'),
+        'test_key' => env('STRIPE_TEST_KEY'),
+        'test_secret' => env('STRIPE_TEST_SECRET'),
+    ],
+    'firebase' => [
+        'credentials' => env('FIREBASE_CREDENTIALS'.storage_path('app/remdy-9668a-4bba7c728033.json')),
+    ],
 
 ];

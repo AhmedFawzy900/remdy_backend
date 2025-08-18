@@ -17,7 +17,7 @@ class FCMService
         $this->messaging = $messaging;
     }
 
-    public function sendNotification($deviceToken, $title, $body, $image, $type = null, $id, $action_url = null)
+    public function sendNotification($deviceToken, $title, $body, $image, $type = null, $id)
     {
         // Create the notification
         $notification = FcmNotification::create($title, $body, $image);
@@ -25,23 +25,25 @@ class FCMService
         $data = [
             'type' => $type,
             'id' => $id,
-            'image' => $image,
-            'action_url' => $action_url,
+            'image' => $image
         ];
         
 
         // Create the cloud message
         $message = CloudMessage::withTarget('token', $deviceToken)
             ->withNotification($notification)->withData($data); // Attach the data payload
-
+       
         try {
+            
             // Ensure $this->messaging is not null
             if ($this->messaging) {
                 $this->messaging->send($message);
             } else {
+              
                 \Log::error('Messaging service is not initialized.');
             }
         } catch (\Exception $e) {
+            // dd($e);
             \Log::error('Firebase Notification Error: ' . $e->getMessage());
         }
     }

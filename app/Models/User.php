@@ -25,6 +25,12 @@ class User extends Authenticatable
         'profile_image',
         'full_name',
         'subscription_plan',
+        'subscription_interval',
+        'subscription_started_at',
+        'subscription_ends_at',
+        'trial_ends_at',
+        'has_used_trial',
+        'last_subscription_reference',
         'account_status',
         'phone',
         'account_verification',
@@ -61,6 +67,10 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'otp_expired_date' => 'date',
+            'subscription_started_at' => 'datetime',
+            'subscription_ends_at' => 'datetime',
+            'trial_ends_at' => 'datetime',
+            'has_used_trial' => 'boolean',
         ];
     }
 
@@ -179,6 +189,22 @@ class User extends Authenticatable
     public function deviceTokens()
     {
         return $this->hasMany(DeviceToken::class);
+    }
+
+    public function hasActiveSubscription(): bool
+    {
+        if ($this->subscription_ends_at && now()->lt($this->subscription_ends_at)) {
+            return true;
+        }
+        if ($this->trial_ends_at && now()->lt($this->trial_ends_at)) {
+            return true;
+        }
+        return false;
+    }
+
+    public function isAtLeastSkilled(): bool
+    {
+        return in_array($this->subscription_plan, [self::PLAN_SKILLED, self::PLAN_MASTER], true);
     }
 
     public function scopeFilterForNotification($query, array $conditions)

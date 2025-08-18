@@ -22,6 +22,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\AdController;
 use App\Http\Controllers\DeviceTokensController;
+use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\InstructorController;
 use App\Http\Controllers\LessonController;
 use App\Http\Controllers\OutNotificationController;
@@ -78,6 +79,13 @@ Route::post('upload/image', [ImageUploadController::class, 'upload']);
 
 // Protected Mobile Routes (Require Authentication)
 Route::prefix('mobile')->middleware('auth:sanctum')->group(function () {
+    // Payments
+    Route::post('payments/intents', [App\Http\Controllers\Mobile\PaymentController::class, 'createPaymentIntent']);
+    Route::post('payments/confirm', [App\Http\Controllers\Mobile\PaymentController::class, 'confirmPayment']);
+    // Subscriptions (no external payments)
+    Route::get('subscriptions/me', [App\Http\Controllers\Mobile\SubscriptionController::class, 'me']);
+    Route::post('subscriptions/activate', [App\Http\Controllers\Mobile\SubscriptionController::class, 'activate']);
+    Route::post('subscriptions/cancel', [App\Http\Controllers\Mobile\SubscriptionController::class, 'cancel']);
     // Favorites management
     Route::post('favorites/add', [App\Http\Controllers\Mobile\FavoriteController::class, 'addToFavorites']);
     Route::post('favorites/remove', [App\Http\Controllers\Mobile\FavoriteController::class, 'removeFromFavorites']);
@@ -170,6 +178,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{blockId}', [App\Http\Controllers\LessonContentBlockController::class, 'destroy']);
         Route::patch('/{blockId}/toggle-status', [App\Http\Controllers\LessonContentBlockController::class, 'toggleStatus']);
     });
+
+    Route::apiResource('feedback', FeedbackController::class)->only(['index']);
 }); 
 
 // Public Mobile App Routes (Guest Mode)
@@ -216,6 +226,9 @@ Route::prefix('mobile')->group(function () {
     Route::get('ads', [AdController::class, 'active']);
     Route::get('home', [App\Http\Controllers\Mobile\HomeController::class, 'index']);
     Route::get('learn', [App\Http\Controllers\Mobile\LearnController::class, 'index']);
+    
+    // Feedback - public submission endpoint
+    Route::post('feedback', [App\Http\Controllers\Mobile\FeedbackController::class, 'store']);
     
     // Contact Us - public submission endpoint
     Route::post('contact-us', [ContactUsController::class, 'store']);

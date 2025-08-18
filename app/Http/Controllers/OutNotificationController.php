@@ -68,14 +68,12 @@ class OutNotificationController extends Controller
         $notification->image = $request->image;
         // dd($data);
         $notification->save();
-
         foreach ($fcm_tokens as $token) {
-            // $token = "cMz-wV6FRnukxWHXk39_x7:APA91bGS2gYHcEEeT3y86UotYHhynCliNsxUIPg2P_ZTMieid-hSKm9uHH3o345qCcTvg3jyCTAICkQesYNdonV5c5qHWRP-CRQRsIls_3WPTPvwFQqB0JU";
-           
             $title = strip_tags($notification->title);
             $description = strip_tags($notification->description);
-            $action_url = $notification->action_url;
-            $this->notificationService->sendNotification($token['token'], $title, $description, $notification->image, $notification->type, $notification->id, $action_url);
+            
+          
+            $this->notificationService->sendNotification($token['token'], $title, $description, $notification->image, $notification->type, $notification->id);
             // $this->notificationService->sendNotification($token->token, "hallo", "test 2 for notification", null, null, "notification");
         }
         return response()->json(['message' => 'Notification sent successfully'], 200);

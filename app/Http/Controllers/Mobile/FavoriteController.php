@@ -8,6 +8,7 @@ use App\Models\Remedy;
 use App\Models\Article;
 use App\Models\Course;
 use App\Models\Video;
+use App\Models\User;
 use App\Http\Resources\RemedyResource;
 use App\Http\Resources\ArticleResource;
 use App\Http\Resources\CourseResource;
@@ -39,7 +40,7 @@ class FavoriteController extends Controller
 
             $user = auth('sanctum')->user();
             $itemId = $request->item_id;
-            $type = $request->type;
+            $type = strtolower($request->type);
 
             // Map type to model class
             $modelMap = [
@@ -70,6 +71,17 @@ class FavoriteController extends Controller
                     'success' => false,
                     'message' => 'Item is already in your favorites'
                 ], 409);
+            }
+
+            // Enforce Rookie plan kit size limit
+            if (strtolower($user->subscription_plan) === strtolower(User::PLAN_ROOKIE)) {
+                $currentFavoritesCount = Favorite::where('user_id', $user->id)->count();
+                if ($currentFavoritesCount >= 10) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Rookie plan limit reached: You can only add up to 10 items to your kit'
+                    ], 403);
+                }
             }
 
             // Add to favorites
@@ -160,6 +172,7 @@ class FavoriteController extends Controller
     {
         try {
             $user = auth('sanctum')->user();
+            /** @var User $user */
             $type = $request->get('type', 'all'); // all, remedy, article, course, video
 
             $favorites = [];
