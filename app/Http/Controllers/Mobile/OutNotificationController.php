@@ -108,4 +108,44 @@ class OutNotificationController extends Controller
 
         ]);
     }
+
+    public function clearAllNotifications(Request $request)
+    {
+        $user = auth('sanctum')->user();
+        $guest = Guest::where('token', $request->fcm_token)->first();
+        
+        if ($user) {
+            $notifications = OutNotification::forUser($user->id)->get(['id', 'user_ids']);
+            foreach ($notifications as $notification) {
+                $ids = $notification->user_ids;
+                if (!is_array($ids)) {
+                    $ids = json_decode($ids ?? '[]', true);
+                }
+                $ids = is_array($ids) ? $ids : [];
+                $filtered = array_values(array_filter($ids, function ($id) use ($user) {
+                    return (int) $id !== (int) $user->id;
+                }));
+                $notification->user_ids = json_encode($filtered);
+                $notification->save();
+            }
+        }
+        if ($guest) {
+            $notifications = OutNotification::forGuest($guest->id)->get(['id', 'guest_ids']);
+            foreach ($notifications as $notification) {
+                $ids = $notification->guest_ids;
+                if (!is_array($ids)) {
+                    $ids = json_decode($ids ?? '[]', true);
+                }
+                $ids = is_array($ids) ? $ids : [];
+                $filtered = array_values(array_filter($ids, function ($id) use ($guest) {
+                    return (int) $id !== (int) $guest->id;
+                }));
+                $notification->guest_ids = json_encode($filtered);
+                $notification->save();
+            }
+        }
+        return response()->json(['message' => 'Notifications cleared successfully'], 200);
+    }
+
+
 }

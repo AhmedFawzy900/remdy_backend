@@ -20,6 +20,13 @@ class OutNotification extends Model
         'seen',
     ];
 
+    public function scopeForUser($query, int $userId)
+    {
+        return $query->whereJsonContains('user_ids', $userId);
+    }
 
-
+    public function scopeForGuest($query, int $guestId)
+    {
+        return $query->whereJsonContains('guest_ids', $guestId);
+    }
 }

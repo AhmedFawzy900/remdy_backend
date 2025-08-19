@@ -15,6 +15,7 @@ use Illuminate\Support\Str;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Laravel\Socialite\Facades\Socialite;
 
 class AuthController extends Controller
 {
@@ -521,155 +522,18 @@ class AuthController extends Controller
     /**
      * Login with Google for mobile app.
      */
-    public function loginWithGoogle(Request $request): JsonResponse
+    public function loginWithGoogle()
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'id_token' => 'required|string',
-                'access_token' => 'required|string',
-                'name' => 'nullable|string|max:255',
-                'email' => 'nullable|email',
-                'profile_image' => 'nullable|url',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            // Verify Google ID token
-            $googleUser = $this->verifyGoogleIdToken($request->id_token);
-            
-            if (!$googleUser) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid Google token'
-                ], 401);
-            }
-
-            // Check if user exists
-            $user = User::where('email', $googleUser['email'])->first();
-
-            if (!$user) {
-                // Create new user
-                $user = User::create([
-                    'name' => $request->name ?? $googleUser['name'] ?? 'Google User',
-                    'full_name' => $request->name ?? $googleUser['name'] ?? 'Google User',
-                    'email' => $googleUser['email'],
-                    'profile_image' => $request->profile_image ?? $googleUser['picture'] ?? null,
-                    'account_status' => User::STATUS_ACTIVE,
-                    'account_verification' => 'yes', // Google accounts are pre-verified
-                    'subscription_plan' => User::PLAN_ROOKIE,
-                    'google_id' => $googleUser['sub'], // Store Google ID
-                    'password' => Hash::make(Str::random(32)), // Generate random password
-                ]);
-            } else {
-                // Update existing user with Google info
-                $user->update([
-                    'google_id' => $googleUser['sub'],
-                    'account_status' => User::STATUS_ACTIVE,
-                    'account_verification' => 'yes',
-                    'profile_image' => $request->profile_image ?? $googleUser['picture'] ?? $user->profile_image,
-                ]);
-            }
-
-            // Create token
-            $token = $user->createToken('mobile-google-token')->plainTextToken;
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Google login successful',
-                'data' => [
-                    'user' => $user,
-                    'token' => $token,
-                    'is_new_user' => $user->wasRecentlyCreated
-                ]
-            ], 200);
-
-        } catch (\Exception $e) {
-            Log::error('Google login error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Google login failed',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return Socialite::driver('google')->stateless()->redirect();
     }
 
     /**
      * Login with Apple for mobile app.
      */
-    public function loginWithApple(Request $request): JsonResponse
+    public function loginWithApple()
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'identity_token' => 'required|string',
-                'authorization_code' => 'required|string',
-                'name' => 'nullable|string|max:255',
-                'email' => 'nullable|email',
-                'profile_image' => 'nullable|url',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            // Verify Apple identity token
-            $appleUser = $this->verifyAppleIdentityToken($request->identity_token);
-            
-            if (!$appleUser) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid Apple token'
-                ], 401);
-            }
-
-            // Check if user exists
-            $user = User::where('email', $appleUser['email'])->first();
-
-            if (!$user) {
-                // Create new user
-                $user = User::create([
-                    'name' => $request->name ?? $appleUser['name'] ?? 'Apple User',
-                    'full_name' => $request->name ?? $appleUser['name'] ?? 'Apple User',
-                    'email' => $appleUser['email'],
-                    'profile_image' => $request->profile_image ?? null,
-                    'account_status' => User::STATUS_ACTIVE,
-                    'account_verification' => 'yes', // Apple accounts are pre-verified
-                    'subscription_plan' => User::PLAN_ROOKIE,
-                    'apple_id' => $appleUser['sub'], // Store Apple ID
-                    'password' => Hash::make(Str::random(32)), // Generate random password
-                ]);
-            } else {
-                // Update existing user with Apple info
-                $user->update([
-                    'apple_id' => $appleUser['sub'],
-                    'account_status' => User::STATUS_ACTIVE,
-                    'account_verification' => 'yes',
-                    'profile_image' => $request->profile_image ?? $user->profile_image,
-                ]);
-            }
-
-            // Create token
-            $token = $user->createToken('mobile-apple-token')->plainTextToken;
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Apple login successful',
-                'data' => [
-                    'user' => $user,
-                    'token' => $token,
-                    'is_new_user' => !$user->wasRecentlyCreated
-                ]
-            ], 200);
-
+            return Socialite::driver('apple')->stateless()->redirect();
         } catch (\Exception $e) {
             Log::error('Apple login error: ' . $e->getMessage());
             return response()->json([
@@ -683,93 +547,11 @@ class AuthController extends Controller
     /**
      * Google OAuth callback for mobile app.
      */
-    public function googleCallback(Request $request): JsonResponse
+    public function googleCallback(Request $request)
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'code' => 'required|string',
-                'state' => 'nullable|string',
-                'error' => 'nullable|string',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            // Check if there's an error from Google
-            if ($request->has('error')) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Google authentication failed',
-                    'error' => $request->error
-                ], 400);
-            }
-
-            // Exchange authorization code for tokens
-            $tokens = $this->exchangeGoogleCodeForTokens($request->code);
-            
-            if (!$tokens) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to exchange authorization code for tokens'
-                ], 400);
-            }
-
-            // Verify the ID token
-            $googleUser = $this->verifyGoogleIdToken($tokens['id_token']);
-            
-            if (!$googleUser) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid Google token'
-                ], 401);
-            }
-
-            // Check if user exists
-            $user = User::where('email', $googleUser['email'])->first();
-
-            if (!$user) {
-                // Create new user
-                $user = User::create([
-                    'name' => $googleUser['name'] ?? 'Google User',
-                    'full_name' => $googleUser['name'] ?? 'Google User',
-                    'email' => $googleUser['email'],
-                    'profile_image' => $googleUser['picture'] ?? null,
-                    'account_status' => User::STATUS_ACTIVE,
-                    'account_verification' => 'yes',
-                    'subscription_plan' => User::PLAN_ROOKIE,
-                    'google_id' => $googleUser['sub'],
-                    'password' => Hash::make(Str::random(32)),
-                ]);
-            } else {
-                // Update existing user with Google info
-                $user->update([
-                    'google_id' => $googleUser['sub'],
-                    'account_status' => User::STATUS_ACTIVE,
-                    'account_verification' => 'yes',
-                    'profile_image' => $googleUser['picture'] ?? $user->profile_image,
-                ]);
-            }
-
-            // Create token
-            $token = $user->createToken('mobile-google-callback-token')->plainTextToken;
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Google authentication successful',
-                'data' => [
-                    'user' => $user,
-                    'token' => $token,
-                    'is_new_user' => !$user->wasRecentlyCreated,
-                    'access_token' => $tokens['access_token'],
-                    'refresh_token' => $tokens['refresh_token'] ?? null,
-                ]
-            ], 200);
-
+            $googleUser = Socialite::driver('google')->stateless()->user();
+            dd($googleUser);
         } catch (\Exception $e) {
             Log::error('Google callback error: ' . $e->getMessage());
             return response()->json([
@@ -778,6 +560,7 @@ class AuthController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+
     }
 
     /**

@@ -28,4 +28,9 @@ class Guest extends Model
             ];
         });
     }
+
+    public function outNotifications()
+    {
+        return $this->hasMany(OutNotification::class);
+    }
 }

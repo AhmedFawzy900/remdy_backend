@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Mobile;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ChecksPlanAccess;
 use App\Models\Course;
 use App\Models\Lesson;
 use App\Models\User;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Validator;
 
 class CourseController extends Controller
 {
+    use ChecksPlanAccess;
     /**
      * Get all available courses for purchase
      */
@@ -215,9 +217,10 @@ class CourseController extends Controller
             ], 404);
         }
         if($user){
+            $canAccessPlan = $this->canAccessByPlan($user, $course->plan);
             return response()->json([
                 'success' => true,
-                'data' => array_merge((new CourseDetailResource($course, $purchase, $started))->toArray(request()), [
+                'data' => array_merge((new CourseDetailResource($course, $purchase, $started, ($purchase !== null) || $canAccessPlan))->toArray(request()), [
                 'ads' => \App\Http\Resources\AdResource::collection(\App\Models\Ad::active()->forPlacement(\App\Models\Ad::TYPE_COURSE, (int)$course->id)->orderBy('created_at', 'desc')->get()),
             ]),
                 'message' => 'Course details retrieved successfully'
@@ -248,19 +251,6 @@ class CourseController extends Controller
     {
         try {
             $user = auth('sanctum')->user();
-            
-            // Check if user purchased this course
-            $purchase = CoursePurchase::where('user_id', $user->id)
-                ->where('course_id', $courseId)
-                ->where('status', 'completed')
-                ->first();
-
-            if (!$purchase) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'You must purchase this course before starting it'
-                ], 400);
-            }
 
             $course = Course::with('lessons')->find($courseId);
             if (!$course) {
@@ -268,6 +258,20 @@ class CourseController extends Controller
                     'success' => false,
                     'message' => 'Course not found'
                 ], 404);
+            }
+
+            // Check purchase or plan-based access
+            $purchase = CoursePurchase::where('user_id', $user->id)
+                ->where('course_id', $courseId)
+                ->where('status', 'completed')
+                ->first();
+
+            $canAccessPlan = $this->canAccessByPlan($user, $course->plan);
+            if (!$purchase && !$canAccessPlan) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You must purchase this course or upgrade your plan to start it'
+                ], 400);
             }
 
             // Mark course as started by creating progress records for all lessons
@@ -400,12 +404,18 @@ class CourseController extends Controller
     {
         try {
             $user = auth('sanctum')->user();
-            
+           
             $validator = Validator::make($request->all(), [
                 'course_id' => 'required|exists:courses,id',
                 'lesson_id' => 'required|exists:lessons,id',
             ]);
-
+            $course = Course::find($request->course_id);
+            if (!$course) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Course not found'
+                ], 404);
+            }
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
@@ -419,8 +429,9 @@ class CourseController extends Controller
                 ->where('course_id', $request->course_id)
                 ->where('status', 'completed')
                 ->first();
-
-            if (!$purchase) {
+           
+            $canAccessPlan = $this->canAccessByPlan($user, $course->plan);
+            if (!$purchase && !$canAccessPlan) {
                 return response()->json([
                     'success' => false,
                     'message' => 'You must purchase this course to access lessons'
@@ -488,16 +499,25 @@ class CourseController extends Controller
         try {
             $user = auth('sanctum')->user();
             
-            // Check if user purchased this course
+            $course = Course::find($courseId);
+            if (!$course) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Course not found'
+                ], 404);
+            }
+
+            // Check if user purchased this course or has plan access
             $purchase = CoursePurchase::where('user_id', $user->id)
                 ->where('course_id', $courseId)
                 ->where('status', 'completed')
                 ->first();
 
-            if (!$purchase) {
+            $canAccessPlan = $this->canAccessByPlan($user, $course->plan);
+            if (!$purchase && !$canAccessPlan) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'You must purchase this course to access lessons'
+                    'message' => 'You must purchase this course or upgrade your plan to access lessons'
                 ], 400);
             }
 
@@ -560,20 +580,6 @@ class CourseController extends Controller
         try {
             $user = auth('sanctum')->user();
             
-            // Check if user purchased this course
-            $purchase = CoursePurchase::where('user_id', $user->id)
-                ->where('course_id', $courseId)
-                ->where('status', 'completed')
-                ->first();
-
-            if (!$purchase) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'You must purchase this course to access progress'
-                ], 400);
-            }
-
-            // Get course with lessons
             $course = Course::with(['lessons' => function($query) {
                 $query->active()->ordered();
             }])->find($courseId);
@@ -583,6 +589,20 @@ class CourseController extends Controller
                     'success' => false,
                     'message' => 'Course not found'
                 ], 404);
+            }
+
+            // Check if user purchased this course or has plan access
+            $purchase = CoursePurchase::where('user_id', $user->id)
+                ->where('course_id', $courseId)
+                ->where('status', 'completed')
+                ->first();
+
+            $canAccessPlan = $this->canAccessByPlan($user, $course->plan);
+            if (!$purchase && !$canAccessPlan) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You must purchase this course or upgrade your plan to access progress'
+                ], 400);
             }
 
             $totalLessons = $course->lessons->count();
@@ -630,16 +650,25 @@ class CourseController extends Controller
         try {
             $user = auth('sanctum')->user();
             
-            // Check if user purchased this course
+            $course = Course::find($courseId);
+            if (!$course) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Course not found'
+                ], 404);
+            }
+
+            // Check if user purchased this course or has plan access
             $purchase = CoursePurchase::where('user_id', $user->id)
                 ->where('course_id', $courseId)
                 ->where('status', 'completed')
                 ->first();
 
-            if (!$purchase) {
+            $canAccessPlan = $this->canAccessByPlan($user, $course->plan);
+            if (!$purchase && !$canAccessPlan) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'You must purchase this course to access lessons'
+                    'message' => 'You must purchase this course or upgrade your plan to access lessons'
                 ], 400);
             }
 
@@ -701,16 +730,25 @@ class CourseController extends Controller
         try {
             $user = auth('sanctum')->user();
             
-            // Check if user purchased this course
+            $course = Course::find($courseId);
+            if (!$course) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Course not found'
+                ], 404);
+            }
+
+            // Check if user purchased this course or has plan access
             $purchase = CoursePurchase::where('user_id', $user->id)
                 ->where('course_id', $courseId)
                 ->where('status', 'completed')
                 ->first();
 
-            if (!$purchase) {
+            $canAccessPlan = $this->canAccessByPlan($user, $course->plan);
+            if (!$purchase && !$canAccessPlan) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'You must purchase this course to access lessons'
+                    'message' => 'You must purchase this course or upgrade your plan to access lessons'
                 ], 400);
             }
 
@@ -776,16 +814,25 @@ class CourseController extends Controller
         try {
             $user = auth('sanctum')->user();
             
-            // Check if user purchased this course
+            $course = Course::find($courseId);
+            if (!$course) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Course not found'
+                ], 404);
+            }
+
+            // Check if user purchased this course or has plan access
             $purchase = CoursePurchase::where('user_id', $user->id)
                 ->where('course_id', $courseId)
                 ->where('status', 'completed')
                 ->first();
 
-            if (!$purchase) {
+            $canAccessPlan = $this->canAccessByPlan($user, $course->plan);
+            if (!$purchase && !$canAccessPlan) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'You must purchase this course to access lessons'
+                    'message' => 'You must purchase this course or upgrade your plan to access lessons'
                 ], 400);
             }
 

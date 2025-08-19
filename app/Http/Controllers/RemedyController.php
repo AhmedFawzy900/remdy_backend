@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Remedy;
 use App\Http\Resources\RemedyResource;
 use App\Http\Resources\RemedyIndexResource;
+use App\Http\Controllers\Concerns\ChecksPlanAccess;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 
 class RemedyController extends Controller
 {
+    use ChecksPlanAccess;
     /**
      * Display a listing of the resource.
      */
@@ -275,6 +277,60 @@ class RemedyController extends Controller
             $relatedRemedies = $this->getRelatedRemedies($remedy);
 
             // Targeted ads for this remedy
+            $ads = \App\Models\Ad::active()->forPlacement(\App\Models\Ad::TYPE_REMEDY, (int)$remedy->id)->orderBy('created_at', 'desc')->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => new RemedyResource($remedy),
+                'related_remedies' => RemedyIndexResource::collection($relatedRemedies),
+                'ads' => \App\Http\Resources\AdResource::collection($ads),
+                'message' => 'Remedy retrieved successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve remedy',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Mobile-only show with plan gating.
+     */
+    public function showForMobile(string $id): JsonResponse
+    {
+        try {
+            $remedy = Remedy::with([
+                'remedyType',
+                'bodySystem',
+                'diseaseRelation',
+                'reviews.user',
+                'reviews.reactions',
+                'remedyTypes',
+                'bodySystems',
+                'diseases'
+            ])->find($id);
+
+            if (!$remedy) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Remedy not found'
+                ], 404);
+            }
+
+            $requiredPlan = $remedy->visible_to_plan; // 'rookie'|'skilled'|'master'|'all'|null
+            $user = auth('sanctum')->user();
+            if (!$this->canAccessByPlan($user, $requiredPlan)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Upgrade required to view this content',
+                    'required_plan' => $this->normalizeRequiredPlan($requiredPlan) ?? 'rookie',
+                    'user_plan' => $this->userEffectivePlan($user),
+                ], 403);
+            }
+
+            $relatedRemedies = $this->getRelatedRemedies($remedy);
             $ads = \App\Models\Ad::active()->forPlacement(\App\Models\Ad::TYPE_REMEDY, (int)$remedy->id)->orderBy('created_at', 'desc')->get();
 
             return response()->json([

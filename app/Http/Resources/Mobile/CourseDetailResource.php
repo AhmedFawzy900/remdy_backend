@@ -9,12 +9,14 @@ class CourseDetailResource extends JsonResource
 {
     private $purchase;
     private $started;
+    private $canAccess;
 
-    public function __construct($resource, $purchase = null, $started = false)
+    public function __construct($resource, $purchase = null, $started = false, $canAccess = null)
     {
         parent::__construct($resource);
         $this->purchase = $purchase;
         $this->started = $started;
+        $this->canAccess = $canAccess;
     }
 
     /**
@@ -47,7 +49,7 @@ class CourseDetailResource extends JsonResource
             'lessons_count' => $this->lessons->count(),
             'purchase_status' => !is_null($this->purchase),
             'is_started' => $this->started,
-            'can_access' => !is_null($this->purchase),
+            'can_access' => is_null($this->canAccess) ? !is_null($this->purchase) : (bool) $this->canAccess,
            
         ];
 

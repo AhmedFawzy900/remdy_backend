@@ -21,11 +21,13 @@ use App\Http\Controllers\ImageUploadController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\AdController;
+use App\Http\Controllers\DashboardStatics;
 use App\Http\Controllers\DeviceTokensController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\InstructorController;
 use App\Http\Controllers\LessonController;
 use App\Http\Controllers\OutNotificationController;
+use App\Http\Controllers\SubscriptionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -124,6 +126,7 @@ Route::prefix('mobile')->middleware('auth:sanctum')->group(function () {
 
 // Protected Routes (Admin Dashboard)
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('dashboard/statics', [DashboardStatics::class, 'index']);
     // Place all routes that require authentication here
     Route::apiResource('admins', AdminController::class);
     Route::apiResource('body-systems', BodySystemController::class);
@@ -180,26 +183,27 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::apiResource('feedback', FeedbackController::class)->only(['index']);
+    Route::apiResource('subscriptions', SubscriptionController::class)->only(['index']);
 }); 
 
 // Public Mobile App Routes (Guest Mode)
 Route::prefix('mobile')->group(function () {
     // Public read-only endpoints for mobile app
     Route::get('remedies', [RemedyController::class, 'index']);
-    Route::get('remedies/{id}', [RemedyController::class, 'show']);
+    Route::get('remedies/{id}', [RemedyController::class, 'showForMobile']);
   
     Route::get('body-systems', [BodySystemController::class, 'index']);
     Route::get('body-systems/{id}', [BodySystemController::class, 'show']);
  
     
     Route::get('articles', [ArticleController::class, 'index']);
-    Route::get('articles/{id}', [ArticleController::class, 'show']);
+    Route::get('articles/{id}', [ArticleController::class, 'showForMobile']);
    
     Route::get('courses', [CourseController::class, 'index']);
     Route::get('courses/{id}', [App\Http\Controllers\Mobile\CourseController::class, 'showCourse']);
    
     Route::get('videos', [VideoController::class, 'index']);
-    Route::get('videos/{id}', [VideoController::class, 'show']);
+    Route::get('videos/{id}', [VideoController::class, 'showForMobile']);
    
     Route::get('faqs', [FaqController::class, 'index']);
     Route::get('faqs/{id}', [FaqController::class, 'show']);
@@ -239,5 +243,5 @@ Route::prefix('mobile')->group(function () {
     Route::get('notifications', [App\Http\Controllers\Mobile\OutNotificationController::class, 'index']);
     Route::get('notifications/{id}', [App\Http\Controllers\Mobile\OutNotificationController::class, 'show']);
     Route::get('notifications/guest', [App\Http\Controllers\Mobile\OutNotificationController::class, 'getNotificationForGuest']);
-
+    Route::delete('notifications/clear', [App\Http\Controllers\Mobile\OutNotificationController::class, 'clearAllNotifications']);
 });

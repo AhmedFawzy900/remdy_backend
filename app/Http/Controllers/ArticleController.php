@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Article;
 use App\Http\Resources\ArticleResource;
 use App\Http\Resources\ArticleIndexResource;
+use App\Http\Controllers\Concerns\ChecksPlanAccess;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 
 class ArticleController extends Controller
 {
+    use ChecksPlanAccess;
     /**
      * Display a listing of the resource.
      */
@@ -142,6 +144,45 @@ class ArticleController extends Controller
                     'success' => false,
                     'message' => 'Article not found'
                 ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => new ArticleResource($article),
+                'message' => 'Article retrieved successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve article',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Mobile-only show with plan gating.
+     */
+    public function showForMobile(string $id): JsonResponse
+    {
+        try {
+            $article = Article::with(['reviews.user', 'reviews.reactions'])->find($id);
+            if (!$article) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Article not found'
+                ], 404);
+            }
+
+            $requiredPlan = $article->plans; // string: rookie|skilled|master|null
+            $user = auth('sanctum')->user();
+            if (!$this->canAccessByPlan($user, $requiredPlan)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Upgrade required to view this content',
+                    'required_plan' => $this->normalizeRequiredPlan($requiredPlan) ?? 'rookie',
+                    'user_plan' => $this->userEffectivePlan($user),
+                ], 403);
             }
 
             return response()->json([

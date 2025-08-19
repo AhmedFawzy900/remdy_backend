@@ -222,4 +222,9 @@ class User extends Authenticatable
             ];
         });
     }
+
+    public function outNotifications()
+    {
+        return $this->hasMany(OutNotification::class);
+    }
 }

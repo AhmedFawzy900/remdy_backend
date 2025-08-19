@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Video;
 use App\Http\Resources\VideoResource;
 use App\Http\Resources\VideoIndexResource;
+use App\Http\Controllers\Concerns\ChecksPlanAccess;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 
 class VideoController extends Controller
 {
+    use ChecksPlanAccess;
     /**
      * Display a listing of the resource.
      */
@@ -148,6 +150,67 @@ class VideoController extends Controller
             $relatedVideos = $this->getRelatedVideos($video);
 
             // Targeted ads for this video
+            $ads = \App\Models\Ad::active()->forPlacement(\App\Models\Ad::TYPE_VIDEO, (int)$video->id)->orderBy('created_at', 'desc')->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => new VideoResource($video),
+                'related_videos' => VideoResource::collection($relatedVideos),
+                'ads' => \App\Http\Resources\AdResource::collection($ads),
+                'message' => 'Video retrieved successfully'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve video',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Mobile-only show with plan gating.
+     */
+    public function showForMobile(string $id): JsonResponse
+    {
+        try {
+            $video = Video::with(['reviews.user', 'reviews.reactions'])->find($id);
+            if (!$video) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Video not found'
+                ], 404);
+            }
+
+            // visiblePlans can be CSV or single string
+            $visible = $video->visiblePlans;
+            $requiredPlan = null;
+            if ($visible) {
+                $lower = strtolower($visible);
+                $parts = array_filter(array_map('trim', explode(',', $lower)));
+                // If multiple, pick highest required plan among them for gating
+                $requiredPlan = null;
+                foreach ($parts as $p) {
+                    if (in_array($p, ['rookie', 'skilled', 'master', 'all'], true)) {
+                        if ($p === 'all') { $requiredPlan = null; break; }
+                        if ($requiredPlan === null || $this->planRank($p) > $this->planRank($requiredPlan)) {
+                            $requiredPlan = $p;
+                        }
+                    }
+                }
+            }
+
+            $user = auth('sanctum')->user();
+            if (!$this->canAccessByPlan($user, $requiredPlan)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Upgrade required to view this content',
+                    'required_plan' => $this->normalizeRequiredPlan($requiredPlan) ?? 'rookie',
+                    'user_plan' => $this->userEffectivePlan($user),
+                ], 403);
+            }
+
+            $relatedVideos = $this->getRelatedVideos($video);
             $ads = \App\Models\Ad::active()->forPlacement(\App\Models\Ad::TYPE_VIDEO, (int)$video->id)->orderBy('created_at', 'desc')->get();
 
             return response()->json([
