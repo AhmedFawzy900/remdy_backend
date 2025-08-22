@@ -551,7 +551,31 @@ class AuthController extends Controller
     {
         try {
             $googleUser = Socialite::driver('google')->stateless()->user();
-            dd($googleUser);
+            $user = User::firstOrCreate([
+                'email' => $googleUser->getEmail(),
+            ], [
+                'name' => $googleUser->getName(),
+                'profile_image' => $googleUser->getAvatar(),
+                'account_status' => User::STATUS_ACTIVE,
+                'account_verification' => 'yes',
+                'subscription_plan' => User::PLAN_ROOKIE,
+                'google_id' => $googleUser->getId(),
+               
+            ]);
+             // Generate token for API
+            $token = $user->createToken('mobile-token')->plainTextToken;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Google authentication successful',
+                'data' => [
+                    'user' => $user,
+                    'token' => $token,
+                    'is_new_user' => !$user->wasRecentlyCreated,
+                    'access_token' => $token,
+                    'refresh_token' => $token,
+                ]
+            ], 200);
         } catch (\Exception $e) {
             Log::error('Google callback error: ' . $e->getMessage());
             return response()->json([
@@ -569,77 +593,21 @@ class AuthController extends Controller
     public function appleCallback(Request $request): JsonResponse
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'code' => 'required|string',
-                'state' => 'nullable|string',
-                'error' => 'nullable|string',
-                'id_token' => 'nullable|string',
+            $appleUser = Socialite::driver('apple')->stateless()->user();
+
+            $user = User::firstOrCreate([
+                'email' => $appleUser->getEmail(),
+            ], [
+                'name' => $appleUser->getName(),
+                'profile_image' => $appleUser->getAvatar(),
+                'account_status' => User::STATUS_ACTIVE,
+                'account_verification' => 'yes',
+                'subscription_plan' => User::PLAN_ROOKIE,
+                'apple_id' => $appleUser->getId(),
             ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            // Check if there's an error from Apple
-            if ($request->has('error')) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Apple authentication failed',
-                    'error' => $request->error
-                ], 400);
-            }
-
-            // Exchange authorization code for tokens
-            $tokens = $this->exchangeAppleCodeForTokens($request->code);
-            
-            if (!$tokens) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to exchange authorization code for tokens'
-                ], 400);
-            }
-
-            // Verify the ID token
-            $appleUser = $this->verifyAppleIdentityToken($tokens['id_token']);
-            
-            if (!$appleUser) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid Apple token'
-                ], 401);
-            }
-
-            // Check if user exists
-            $user = User::where('email', $appleUser['email'])->first();
-
-            if (!$user) {
-                // Create new user
-                $user = User::create([
-                    'name' => $appleUser['name'] ?? 'Apple User',
-                    'full_name' => $appleUser['name'] ?? 'Apple User',
-                    'email' => $appleUser['email'],
-                    'profile_image' => null,
-                    'account_status' => User::STATUS_ACTIVE,
-                    'account_verification' => 'yes',
-                    'subscription_plan' => User::PLAN_ROOKIE,
-                    'apple_id' => $appleUser['sub'],
-                    'password' => Hash::make(Str::random(32)),
-                ]);
-            } else {
-                // Update existing user with Apple info
-                $user->update([
-                    'apple_id' => $appleUser['sub'],
-                    'account_status' => User::STATUS_ACTIVE,
-                    'account_verification' => 'yes',
-                ]);
-            }
-
-            // Create token
-            $token = $user->createToken('mobile-apple-callback-token')->plainTextToken;
+            // Generate token for API
+            $token = $user->createToken('mobile-token')->plainTextToken;
 
             return response()->json([
                 'success' => true,
@@ -648,11 +616,10 @@ class AuthController extends Controller
                     'user' => $user,
                     'token' => $token,
                     'is_new_user' => !$user->wasRecentlyCreated,
-                    'access_token' => $tokens['access_token'],
-                    'refresh_token' => $tokens['refresh_token'] ?? null,
+                    'access_token' => $token,
+                    'refresh_token' => $token,
                 ]
             ], 200);
-
         } catch (\Exception $e) {
             Log::error('Apple callback error: ' . $e->getMessage());
             return response()->json([
@@ -662,6 +629,9 @@ class AuthController extends Controller
             ], 500);
         }
     }
+
+
+
 
     /**
      * Verify Google ID token.
