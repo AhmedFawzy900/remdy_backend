@@ -227,4 +227,23 @@ class User extends Authenticatable
     {
         return $this->hasMany(OutNotification::class);
     }
+
+    /**
+     * Get user's subscription history
+     */
+    public function subscriptionHistories()
+    {
+        return $this->hasMany(SubscriptionHistory::class);
+    }
+
+    /**
+     * Get user's current active subscription from history
+     */
+    public function activeSubscription()
+    {
+        return $this->hasOne(SubscriptionHistory::class)
+                    ->where('status', 'active')
+                    ->where('ends_at', '>', now())
+                    ->latest('started_at');
+    }
 }

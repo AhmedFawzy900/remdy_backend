@@ -633,74 +633,6 @@ class AuthController extends Controller
 
 
 
-    /**
-     * Verify Google ID token.
-     */
-    private function verifyGoogleIdToken(string $idToken): ?array
-    {
-        try {
-            $response = Http::get('https://oauth2.googleapis.com/tokeninfo', [
-                'id_token' => $idToken
-            ]);
-
-            if ($response->successful()) {
-                $data = $response->json();
-                
-                // Verify the token is for your app
-                if ($data['aud'] !== config('services.google.client_id')) {
-                    return null;
-                }
-
-                return [
-                    'sub' => $data['sub'],
-                    'email' => $data['email'],
-                    'name' => $data['name'] ?? null,
-                    'picture' => $data['picture'] ?? null,
-                ];
-            }
-
-            return null;
-        } catch (\Exception $e) {
-            Log::error('Google token verification error: ' . $e->getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * Verify Apple identity token.
-     */
-    private function verifyAppleIdentityToken(string $identityToken): ?array
-    {
-        try {
-            // You should implement proper JWT verification with Apple's public keys
-            // For now, this is a basic implementation
-            $tokenParts = explode('.', $identityToken);
-            if (count($tokenParts) !== 3) {
-                return null;
-            }
-    
-            $payload = json_decode(base64_decode(str_pad(strtr($tokenParts[1], '-_', '+/'), strlen($tokenParts[1]) % 4, '=', STR_PAD_RIGHT)), true);
-    
-            // Verify the token is for your app
-            if ($payload['aud'] !== config('services.apple.client_id')) {
-                return null;
-            }
-    
-            // Verify token hasn't expired
-            if ($payload['exp'] < time()) {
-                return null;
-            }
-    
-            return [
-                'sub' => $payload['sub'],
-                'email' => $payload['email'] ?? null,
-                'name' => null, // Apple doesn't provide name in JWT
-            ];
-        } catch (\Exception $e) {
-            Log::error('Apple token verification error: ' . $e->getMessage());
-            return null;
-        }
-    }
 
     /**
      * Exchange Google authorization code for tokens.
@@ -966,5 +898,358 @@ class AuthController extends Controller
     private function checkEmail(string $email): ?User
     {
         return User::where('email', $email)->first();
+    }
+
+
+
+        /**
+     * Handle Google token authentication for mobile app.
+     */
+    public function googleTokenAuth(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'access_token' => 'required|string',
+                'id_token' => 'nullable|string', // Optional but recommended for better security
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // Get user info from Google using the access token
+            $googleUser = $this->getGoogleUserFromToken($request->access_token);
+            
+            if (!$googleUser) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid Google access token'
+                ], 401);
+            }
+
+            // Verify ID token if provided (additional security)
+            if ($request->id_token) {
+                $idTokenData = $this->verifyGoogleIdToken($request->id_token);
+                if (!$idTokenData || $idTokenData['sub'] !== $googleUser['id']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Invalid Google ID token'
+                    ], 401);
+                }
+            }
+
+            // Find or create user
+            $user = User::where('google_id', $googleUser['id'])
+                       ->orWhere('email', $googleUser['email'])
+                       ->first();
+
+            if ($user) {
+                // Update existing user with Google data if not already set
+                $this->updateUserGoogleData($user, $googleUser);
+            } else {
+                // Create new user
+                $user = User::create([
+                    'name' => $googleUser['name'] ?? 'Google User',
+                    'full_name' => $googleUser['name'] ?? 'Google User',
+                    'email' => $googleUser['email'],
+                    'profile_image' => $googleUser['picture'] ?? null,
+                    'google_id' => $googleUser['id'],
+                    'account_status' => User::STATUS_ACTIVE,
+                    'account_verification' => 'yes',
+                    'subscription_plan' => User::PLAN_ROOKIE,
+                    'email_verified_at' => now(),
+                    'password' => Hash::make('password'),
+                ]);
+            }
+
+            // Generate API token
+            $token = $user->createToken('mobile-google-token')->plainTextToken;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Google authentication successful',
+                'data' => [
+                    'user' => $user,
+                    'token' => $token,
+                    'is_new_user' => $user->wasRecentlyCreated ?? false,
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Google token auth error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Google authentication failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Handle Apple token authentication for mobile app.
+     */
+    public function appleTokenAuth(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'identity_token' => 'required|string',
+                'authorization_code' => 'nullable|string',
+                'user_data' => 'nullable|array', // Apple only sends user data on first auth
+                'user_data.name' => 'nullable|array',
+                'user_data.name.firstName' => 'nullable|string',
+                'user_data.name.lastName' => 'nullable|string',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // Verify Apple identity token
+            $appleUser = $this->verifyAppleIdentityToken($request->identity_token);
+            
+            if (!$appleUser) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid Apple identity token'
+                ], 401);
+            }
+
+            // Find or create user
+            $user = User::where('apple_id', $appleUser['sub'])
+                       ->orWhere('email', $appleUser['email'])
+                       ->first();
+
+            if ($user) {
+                // Update existing user with Apple data if not already set
+                $this->updateUserAppleData($user, $appleUser);
+            } else {
+                // Handle user name (Apple only provides it on first auth)
+                $name = 'Apple User';
+                if ($request->user_data && isset($request->user_data['name'])) {
+                    $firstName = $request->user_data['name']['firstName'] ?? '';
+                    $lastName = $request->user_data['name']['lastName'] ?? '';
+                    $name = trim($firstName . ' ' . $lastName) ?: 'Apple User';
+                }
+
+                // Create new user
+                $user = User::create([
+                    'name' => $name,
+                    'full_name' => $name,
+                    'email' => $appleUser['email'],
+                    'apple_id' => $appleUser['sub'],
+                    'account_status' => User::STATUS_ACTIVE,
+                    'account_verification' => 'yes',
+                    'subscription_plan' => User::PLAN_ROOKIE,
+                    'email_verified_at' => now(),
+                    'password' => Hash::make('password'),
+                ]);
+            }
+
+            // Generate API token
+            $token = $user->createToken('mobile-apple-token')->plainTextToken;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Apple authentication successful',
+                'data' => [
+                    'user' => $user,
+                    'token' => $token,
+                    'is_new_user' => $user->wasRecentlyCreated ?? false,
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Apple token auth error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Apple authentication failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get Google user data from access token.
+     */
+    private function getGoogleUserFromToken(string $accessToken): ?array
+    {
+        try {
+            $response = Http::get('https://www.googleapis.com/oauth2/v1/userinfo', [
+                'access_token' => $accessToken
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                return [
+                    'id' => $data['id'],
+                    'email' => $data['email'],
+                    'name' => $data['name'] ?? null,
+                    'picture' => $data['picture'] ?? null,
+                    'verified_email' => $data['verified_email'] ?? false,
+                ];
+            }
+
+            Log::error('Google user info request failed: ' . $response->body());
+            return null;
+        } catch (\Exception $e) {
+            Log::error('Google user info error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Update existing user with Google data.
+     */
+    private function updateUserGoogleData(User $user, array $googleUser): void
+    {
+        $updateData = [];
+
+        if (!$user->google_id) {
+            $updateData['google_id'] = $googleUser['id'];
+        }
+
+        if (!$user->profile_image && !empty($googleUser['picture'])) {
+            $updateData['profile_image'] = $googleUser['picture'];
+        }
+
+        if (!$user->email_verified_at && !empty($googleUser['verified_email'])) {
+            $updateData['email_verified_at'] = now();
+            $updateData['account_verification'] = 'yes';
+        }
+
+        if (!empty($updateData)) {
+            $user->update($updateData);
+        }
+    }
+
+    /**
+     * Update existing user with Apple data.
+     */
+    private function updateUserAppleData(User $user, array $appleUser): void
+    {
+        $updateData = [];
+
+        if (!$user->apple_id) {
+            $updateData['apple_id'] = $appleUser['sub'];
+        }
+
+        if (!$user->email_verified_at) {
+            $updateData['email_verified_at'] = now();
+            $updateData['account_verification'] = 'yes';
+        }
+
+        if (!empty($updateData)) {
+            $user->update($updateData);
+        }
+    }
+
+    /**
+     * Verify Google ID token (enhanced security).
+     */
+    private function verifyGoogleIdToken(string $idToken): ?array
+    {
+        try {
+            $response = Http::get('https://oauth2.googleapis.com/tokeninfo', [
+                'id_token' => $idToken
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                // Verify the token is for your app
+                if ($data['aud'] !== config('services.google.client_id')) {
+                    Log::error('Google ID token audience mismatch');
+                    return null;
+                }
+
+                // Verify token hasn't expired
+                if ($data['exp'] < time()) {
+                    Log::error('Google ID token expired');
+                    return null;
+                }
+
+                return [
+                    'sub' => $data['sub'],
+                    'email' => $data['email'],
+                    'name' => $data['name'] ?? null,
+                    'picture' => $data['picture'] ?? null,
+                    'email_verified' => $data['email_verified'] ?? false,
+                ];
+            }
+
+            Log::error('Google ID token verification failed: ' . $response->body());
+            return null;
+        } catch (\Exception $e) {
+            Log::error('Google ID token verification error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Verify Apple identity token (enhanced implementation).
+     */
+    private function verifyAppleIdentityToken(string $identityToken): ?array
+    {
+        try {
+            // Split the JWT token
+            $tokenParts = explode('.', $identityToken);
+            if (count($tokenParts) !== 3) {
+                Log::error('Apple identity token format invalid');
+                return null;
+            }
+
+            // Decode the payload
+            $payload = json_decode(
+                base64_decode(
+                    str_pad(
+                        strtr($tokenParts[1], '-_', '+/'), 
+                        strlen($tokenParts[1]) % 4, 
+                        '=', 
+                        STR_PAD_RIGHT
+                    )
+                ), 
+                true
+            );
+
+            if (!$payload) {
+                Log::error('Apple identity token payload decode failed');
+                return null;
+            }
+
+            // Verify the token is for your app
+            if ($payload['aud'] !== config('services.apple.client_id')) {
+                Log::error('Apple identity token audience mismatch');
+                return null;
+            }
+
+            // Verify token hasn't expired
+            if ($payload['exp'] < time()) {
+                Log::error('Apple identity token expired');
+                return null;
+            }
+
+            // Verify issuer
+            if ($payload['iss'] !== 'https://appleid.apple.com') {
+                Log::error('Apple identity token issuer invalid');
+                return null;
+            }
+
+            return [
+                'sub' => $payload['sub'],
+                'email' => $payload['email'] ?? null,
+                'email_verified' => $payload['email_verified'] ?? false,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Apple identity token verification error: ' . $e->getMessage());
+            return null;
+        }
     }
 } 

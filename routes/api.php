@@ -26,6 +26,7 @@ use App\Http\Controllers\DeviceTokensController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\InstructorController;
 use App\Http\Controllers\LessonController;
+use App\Http\Controllers\Mobile\AuthController as MobileAuthController;
 use App\Http\Controllers\OutNotificationController;
 use App\Http\Controllers\SubscriptionController;
 
@@ -51,6 +52,10 @@ Route::post('auth/login/google', [AuthController::class, 'loginWithGoogle']);
 Route::post('auth/login/apple', [AuthController::class, 'loginWithApple']);
 Route::post('auth/admin/login', [AuthController::class, 'adminLogin']);
 Route::post('auth/admin/refresh', [AuthController::class, 'refreshAdminToken']);
+
+// Social Authentication - Token Based (for mobile apps)
+ Route::post('mobile/google/token', [MobileAuthController::class, 'googleTokenAuth']);
+ Route::post('mobile/apple/token', [MobileAuthController::class, 'appleTokenAuth']);
 
 // Mobile Authentication Routes
 Route::prefix('mobile/auth')->group(function () {
@@ -88,6 +93,7 @@ Route::prefix('mobile')->middleware('auth:sanctum')->group(function () {
     Route::get('subscriptions/me', [App\Http\Controllers\Mobile\SubscriptionController::class, 'me']);
     Route::post('subscriptions/activate', [App\Http\Controllers\Mobile\SubscriptionController::class, 'activate']);
     Route::post('subscriptions/cancel', [App\Http\Controllers\Mobile\SubscriptionController::class, 'cancel']);
+    Route::get('subscriptions/purchase-history', [App\Http\Controllers\Mobile\SubscriptionController::class, 'purchaseHistory']);
     // Favorites management
     Route::post('favorites/add', [App\Http\Controllers\Mobile\FavoriteController::class, 'addToFavorites']);
     Route::post('favorites/remove', [App\Http\Controllers\Mobile\FavoriteController::class, 'removeFromFavorites']);
@@ -136,6 +142,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('remedies', RemedyController::class);
     Route::patch('remedies/{id}/toggle-status', [RemedyController::class, 'toggleStatus']);
     Route::get('remedies/{id}/dashboard', [RemedyController::class, 'showForDashboard']);
+    Route::post('/remedy-ai', [RemedyController::class, 'getRemedyInfo']);
     Route::apiResource('users', UserController::class);
     Route::patch('users/{id}/toggle-status', [UserController::class, 'toggleStatus']);
     Route::apiResource('articles', ArticleController::class);

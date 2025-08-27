@@ -6,6 +6,7 @@ use App\Models\Remedy;
 use App\Http\Resources\RemedyResource;
 use App\Http\Resources\RemedyIndexResource;
 use App\Http\Controllers\Concerns\ChecksPlanAccess;
+use App\Services\RemedyAIService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -13,6 +14,40 @@ use Illuminate\Support\Facades\Validator;
 class RemedyController extends Controller
 {
     use ChecksPlanAccess;
+    protected $remedyAIService;
+
+    public function __construct(RemedyAIService $remedyAIService)
+    {
+        $this->remedyAIService = $remedyAIService;
+    }
+
+    public function getRemedyInfo(Request $request): JsonResponse
+    {
+        $request->validate([
+            'query' => 'required|string|max:255',
+        ]);
+
+        $query = $request->input('query');
+        
+        // Optional: Rate limiting or user authentication checks here
+        
+        $result = $this->remedyAIService->getRemedyInformation($query);
+        
+        if ($result['success']) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Remedy information retrieved successfully',
+                'data' => $result['data']
+            ], 200);
+        }
+        
+        return response()->json([
+            'success' => false,
+            'message' => $result['error'] ?? 'Failed to retrieve remedy information',
+            'data' => null
+        ], 500);
+    }
+    
     /**
      * Display a listing of the resource.
      */
