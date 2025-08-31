@@ -29,6 +29,7 @@ use App\Http\Controllers\LessonController;
 use App\Http\Controllers\Mobile\AuthController as MobileAuthController;
 use App\Http\Controllers\OutNotificationController;
 use App\Http\Controllers\SubscriptionController;
+use App\Http\Controllers\SubscriptionWebhookController;
 
 /*
 |--------------------------------------------------------------------------
@@ -82,6 +83,13 @@ Route::post('forget-password', [App\Http\Controllers\Mobile\AuthController::clas
 
 // Image Upload
 Route::post('upload/image', [ImageUploadController::class, 'upload']);
+
+// Webhook Routes (No Authentication Required)
+Route::prefix('webhooks')->group(function () {
+    Route::post('apple', [App\Http\Controllers\SubscriptionWebhookController::class, 'handleAppleWebhook']);
+    Route::post('google', [App\Http\Controllers\SubscriptionWebhookController::class, 'handleGoogleWebhook']);
+    Route::post('test', [App\Http\Controllers\SubscriptionWebhookController::class, 'handleTestWebhook']); // For development/testing
+});
 
 
 // Protected Mobile Routes (Require Authentication)

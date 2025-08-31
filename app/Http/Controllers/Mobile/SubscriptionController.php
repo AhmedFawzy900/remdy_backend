@@ -42,6 +42,7 @@ class SubscriptionController extends Controller
             'amount_paid' => 'nullable|numeric|min:0',
             'payment_method' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:500',
+            'platform' => 'nullable|string|max:100',
         ]);
         if ($validator->fails()) {
             return response()->json([
@@ -100,6 +101,7 @@ class SubscriptionController extends Controller
                 'amount_paid' => $amountPaid,
                 'payment_method' => $request->payment_method ?? null,
                 'notes' => $request->notes ?? null,
+                'platform' => $request->platform ?? null,
             ]);
 
             // Update user table for backward compatibility (optional)
@@ -125,6 +127,7 @@ class SubscriptionController extends Controller
                 'amount_paid' => $amountPaid,
                 'payment_method' => null,
                 'notes' => 'Downgraded to rookie plan',
+                'platform' => $request->platform ?? null,
             ]);
 
             // Update user table for backward compatibility
@@ -175,6 +178,7 @@ class SubscriptionController extends Controller
             'amount_paid' => 0,
             'payment_method' => null,
             'notes' => 'Subscription cancelled and downgraded to rookie',
+            'platform' => null,
         ]);
 
         // Update user table for backward compatibility

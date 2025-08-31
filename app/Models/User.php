@@ -80,6 +80,7 @@ class User extends Authenticatable
     const PLAN_PRO = 'pro';
     const PLAN_ROOKIE = 'rookie';
     const PLAN_MASTER = 'master';
+
     const PLAN_SKILLED = 'skilled';
 
     // Account Status Constants
@@ -191,6 +192,9 @@ class User extends Authenticatable
         return $this->hasMany(DeviceToken::class);
     }
 
+    /**
+     * Check if user has an active subscription
+     */
     public function hasActiveSubscription(): bool
     {
         if ($this->subscription_ends_at && now()->lt($this->subscription_ends_at)) {
@@ -245,5 +249,20 @@ class User extends Authenticatable
                     ->where('status', 'active')
                     ->where('ends_at', '>', now())
                     ->latest('started_at');
+    }
+
+    /**
+     * Get the current active subscription
+     */
+    public function getCurrentSubscription()
+    {
+        return $this->subscriptionHistories()
+            ->where('status', 'active')
+            ->where(function ($query) {
+                $query->whereNull('ends_at')
+                      ->orWhere('ends_at', '>', now());
+            })
+            ->latest('started_at')
+            ->first();
     }
 }

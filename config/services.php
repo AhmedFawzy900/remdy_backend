@@ -39,6 +39,11 @@ return [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI'),
+        // Google Play In-App Purchase Configuration
+        'play_console_credentials' => env('GOOGLE_PLAY_CREDENTIALS_PATH', storage_path('app/remdy-9668a-4bba7c728033.json')),
+        'webhook_secret' => env('GOOGLE_WEBHOOK_SECRET'),
+        'webhook_url' => env('GOOGLE_WEBHOOK_URL', env('APP_URL') . '/api/webhooks/google'),
+        'package_name' => env('GOOGLE_PACKAGE_NAME'),
     ],
 
     'apple' => [
@@ -48,6 +53,10 @@ return [
         'key_id' => env('APPLE_KEY_ID'),
         'team_id' => env('APPLE_TEAM_ID'),
         'private_key_path' => env('APPLE_PRIVATE_KEY_PATH', storage_path('app/private/AuthKey_' . env('APPLE_KEY_ID', '') . '.p8')),
+        // In-App Purchase Webhook Configuration
+        'shared_secret' => env('APPLE_SHARED_SECRET'),
+        'webhook_url' => env('APPLE_WEBHOOK_URL', env('APP_URL') . '/api/webhooks/apple'),
+        'sandbox_mode' => env('APPLE_SANDBOX_MODE', true),
     ],
     'stripe' => [
         'secret' => env('STRIPE_SECRET'),

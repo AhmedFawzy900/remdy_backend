@@ -22,6 +22,7 @@ class SubscriptionHistory extends Model
         'amount_paid',
         'payment_method',
         'notes',
+        'platform',
     ];
 
     protected $casts = [

@@ -16,6 +16,9 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Laravel\Socialite\Facades\Socialite;
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
+use Firebase\JWT\JWK;
 
 class AuthController extends Controller
 {
@@ -997,11 +1000,7 @@ class AuthController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'identity_token' => 'required|string',
-                'authorization_code' => 'nullable|string',
-                'user_data' => 'nullable|array', // Apple only sends user data on first auth
-                'user_data.name' => 'nullable|array',
-                'user_data.name.firstName' => 'nullable|string',
-                'user_data.name.lastName' => 'nullable|string',
+                'user_data' => 'nullable|array', // Optional user data from Apple
             ]);
 
             if ($validator->fails()) {
@@ -1012,7 +1011,7 @@ class AuthController extends Controller
                 ], 422);
             }
 
-            // Verify Apple identity token
+            // Verify Apple identity token with proper JWT verification
             $appleUser = $this->verifyAppleIdentityToken($request->identity_token);
             
             if (!$appleUser) {
@@ -1022,9 +1021,20 @@ class AuthController extends Controller
                 ], 401);
             }
 
+            // Extract email from verified token
+            $email = $appleUser['email'] ?? null;
+            $appleId = $appleUser['sub'] ?? null;
+
+            if (!$email || !$appleId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Required user data not found in Apple token'
+                ], 400);
+            }
+
             // Find or create user
-            $user = User::where('apple_id', $appleUser['sub'])
-                       ->orWhere('email', $appleUser['email'])
+            $user = User::where('apple_id', $appleId)
+                       ->orWhere('email', $email)
                        ->first();
 
             if ($user) {
@@ -1032,24 +1042,19 @@ class AuthController extends Controller
                 $this->updateUserAppleData($user, $appleUser);
             } else {
                 // Handle user name (Apple only provides it on first auth)
-                $name = 'Apple User';
-                if ($request->user_data && isset($request->user_data['name'])) {
-                    $firstName = $request->user_data['name']['firstName'] ?? '';
-                    $lastName = $request->user_data['name']['lastName'] ?? '';
-                    $name = trim($firstName . ' ' . $lastName) ?: 'Apple User';
-                }
+                $name = $this->extractUserNameFromAppleData($request->user_data);
 
                 // Create new user
                 $user = User::create([
                     'name' => $name,
                     'full_name' => $name,
-                    'email' => $appleUser['email'],
-                    'apple_id' => $appleUser['sub'],
+                    'email' => $email,
+                    'apple_id' => $appleId,
                     'account_status' => User::STATUS_ACTIVE,
                     'account_verification' => 'yes',
                     'subscription_plan' => User::PLAN_ROOKIE,
                     'email_verified_at' => now(),
-                    'password' => Hash::make('password'),
+                    'password' => Hash::make(Str::random(32)), // Random password for OAuth users
                 ]);
             }
 
@@ -1067,11 +1072,14 @@ class AuthController extends Controller
             ], 200);
 
         } catch (\Exception $e) {
-            Log::error('Apple token auth error: ' . $e->getMessage());
+            Log::error('Apple token auth error: ' . $e->getMessage(), [
+                'token' => substr($request->identity_token ?? '', 0, 50) . '...',
+                'trace' => $e->getTraceAsString()
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Apple authentication failed',
-                'error' => $e->getMessage()
+                'error' => config('app.debug') ? $e->getMessage() : 'Authentication failed'
             ], 500);
         }
     }
@@ -1194,62 +1202,221 @@ class AuthController extends Controller
     }
 
     /**
-     * Verify Apple identity token (enhanced implementation).
+     * Verify Apple identity token with proper JWT signature verification.
      */
     private function verifyAppleIdentityToken(string $identityToken): ?array
     {
         try {
-            // Split the JWT token
-            $tokenParts = explode('.', $identityToken);
-            if (count($tokenParts) !== 3) {
-                Log::error('Apple identity token format invalid');
+            // Decode JWT header to get key ID
+            $header = $this->decodeJWTHeader($identityToken);
+            if (!$header || !isset($header['kid']) || !isset($header['alg'])) {
+                Log::error('Apple identity token: Invalid JWT header', ['header' => $header]);
                 return null;
             }
 
-            // Decode the payload
-            $payload = json_decode(
-                base64_decode(
-                    str_pad(
-                        strtr($tokenParts[1], '-_', '+/'), 
-                        strlen($tokenParts[1]) % 4, 
-                        '=', 
-                        STR_PAD_RIGHT
-                    )
-                ), 
-                true
-            );
-
-            if (!$payload) {
-                Log::error('Apple identity token payload decode failed');
+            // Validate algorithm
+            if ($header['alg'] !== 'RS256') {
+                Log::error('Apple identity token: Unsupported algorithm', ['alg' => $header['alg']]);
                 return null;
             }
 
-            // Verify the token is for your app
-            if ($payload['aud'] !== config('services.apple.client_id')) {
-                Log::error('Apple identity token audience mismatch');
+            // Get Apple's public keys
+            $appleKeys = $this->getApplePublicKeys();
+            if (!$appleKeys) {
+                Log::error('Apple identity token: Failed to fetch Apple public keys');
                 return null;
             }
 
-            // Verify token hasn't expired
-            if ($payload['exp'] < time()) {
-                Log::error('Apple identity token expired');
+            // Find the correct public key using key ID
+            $publicKey = null;
+            foreach ($appleKeys['keys'] as $key) {
+                if ($key['kid'] === $header['kid']) {
+                    $publicKey = $key;
+                    break;
+                }
+            }
+
+            if (!$publicKey) {
+                Log::error('Apple identity token: Public key not found', ['kid' => $header['kid']]);
                 return null;
             }
 
-            // Verify issuer
-            if ($payload['iss'] !== 'https://appleid.apple.com') {
-                Log::error('Apple identity token issuer invalid');
+            // Convert JWK to PEM format and verify JWT
+            $keySet = [$header['kid'] => $publicKey];
+            $jwkSet = JWK::parseKeySet(['keys' => array_values($keySet)]);
+            
+            // Decode and verify JWT
+            $decoded = JWT::decode($identityToken, $jwkSet);
+            $payload = (array) $decoded;
+
+            // Validate token claims
+            $validationResult = $this->validateAppleTokenClaims($payload);
+            if (!$validationResult['valid']) {
+                Log::error('Apple identity token: Claims validation failed', [
+                    'reason' => $validationResult['reason'],
+                    'payload' => $payload
+                ]);
                 return null;
             }
+
+            Log::info('Apple identity token verified successfully', [
+                'sub' => $payload['sub'],
+                'email' => $payload['email'] ?? 'not_provided'
+            ]);
 
             return [
                 'sub' => $payload['sub'],
                 'email' => $payload['email'] ?? null,
                 'email_verified' => $payload['email_verified'] ?? false,
+                'iss' => $payload['iss'],
+                'aud' => $payload['aud'],
+                'exp' => $payload['exp'],
+                'iat' => $payload['iat'],
             ];
+
+        } catch (\Firebase\JWT\ExpiredException $e) {
+            Log::error('Apple identity token expired', ['error' => $e->getMessage()]);
+            return null;
+        } catch (\Firebase\JWT\SignatureInvalidException $e) {
+            Log::error('Apple identity token signature invalid', ['error' => $e->getMessage()]);
+            return null;
         } catch (\Exception $e) {
-            Log::error('Apple identity token verification error: ' . $e->getMessage());
+            Log::error('Apple identity token verification error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return null;
         }
+    }
+
+    /**
+     * Fetch Apple's public keys from JWKS endpoint.
+     */
+    private function getApplePublicKeys(): ?array
+    {
+        try {
+            $cacheKey = 'apple_public_keys';
+            $cacheTtl = 3600; // Cache for 1 hour
+
+            // Try to get from cache first
+            if (cache()->has($cacheKey)) {
+                return cache($cacheKey);
+            }
+
+            // Fetch from Apple's JWKS endpoint
+            $response = Http::timeout(10)->get('https://appleid.apple.com/auth/keys');
+            
+            if (!$response->successful()) {
+                Log::error('Failed to fetch Apple public keys', [
+                    'status' => $response->status(),
+                    'body' => $response->body()
+                ]);
+                return null;
+            }
+
+            $keys = $response->json();
+            
+            if (!isset($keys['keys']) || !is_array($keys['keys'])) {
+                Log::error('Invalid Apple public keys response', ['response' => $keys]);
+                return null;
+            }
+
+            // Cache the keys
+            cache([$cacheKey => $keys], $cacheTtl);
+
+            Log::info('Apple public keys fetched successfully', [
+                'key_count' => count($keys['keys'])
+            ]);
+
+            return $keys;
+
+        } catch (\Exception $e) {
+            Log::error('Error fetching Apple public keys', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Decode JWT header without verification.
+     */
+    private function decodeJWTHeader(string $jwt): ?array
+    {
+        try {
+            $parts = explode('.', $jwt);
+            if (count($parts) !== 3) {
+                return null;
+            }
+
+            $header = json_decode(
+                base64_decode(
+                    str_pad(
+                        strtr($parts[0], '-_', '+/'),
+                        strlen($parts[0]) % 4,
+                        '=',
+                        STR_PAD_RIGHT
+                    )
+                ),
+                true
+            );
+
+            return $header ?: null;
+        } catch (\Exception $e) {
+            Log::error('Error decoding JWT header', ['error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
+    /**
+     * Validate Apple token claims.
+     */
+    private function validateAppleTokenClaims(array $payload): array
+    {
+        // Check issuer
+        if (!isset($payload['iss']) || $payload['iss'] !== 'https://appleid.apple.com') {
+            return ['valid' => false, 'reason' => 'Invalid issuer'];
+        }
+
+        // Check audience
+        $expectedAudience = config('services.apple.client_id');
+        if (!isset($payload['aud']) || $payload['aud'] !== $expectedAudience) {
+            return ['valid' => false, 'reason' => 'Invalid audience'];
+        }
+
+        // Check expiration
+        if (!isset($payload['exp']) || $payload['exp'] < time()) {
+            return ['valid' => false, 'reason' => 'Token expired'];
+        }
+
+        // Check issued at time (not too far in the future)
+        if (!isset($payload['iat']) || $payload['iat'] > (time() + 60)) {
+            return ['valid' => false, 'reason' => 'Invalid issued at time'];
+        }
+
+        // Check subject
+        if (!isset($payload['sub']) || empty($payload['sub'])) {
+            return ['valid' => false, 'reason' => 'Missing subject'];
+        }
+
+        return ['valid' => true];
+    }
+
+    /**
+     * Extract user name from Apple user data.
+     */
+    private function extractUserNameFromAppleData(?array $userData): string
+    {
+        if (!$userData || !isset($userData['name'])) {
+            return 'Apple User';
+        }
+
+        $firstName = $userData['name']['firstName'] ?? '';
+        $lastName = $userData['name']['lastName'] ?? '';
+        
+        $fullName = trim($firstName . ' ' . $lastName);
+        
+        return $fullName ?: 'Apple User';
     }
 } 
